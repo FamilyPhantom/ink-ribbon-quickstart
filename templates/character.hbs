@@ -1,0 +1,299 @@
+<div class="ir-sheet">
+  <header class="ir-header">
+    <img class="ir-portrait" src="{{actor.img}}" data-action="editImage" data-edit="img" title="{{actor.name}}">
+    <div class="ir-identity">
+      <input class="ir-name" type="text" name="name" value="{{actor.name}}" placeholder="Name">
+      <div class="ir-row">
+        <label>Occupation <input type="text" name="system.details.occupation" value="{{system.details.occupation}}"></label>
+        <label>Player <input type="text" name="system.details.player" value="{{system.details.player}}"></label>
+      </div>
+    </div>
+    <div class="ir-state state-{{ecg.state}}" data-state="{{ecg.state}}">
+      <svg class="state-beat" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+        <path class="beat-line" d="{{ecg.miniPath}}"/><path class="beat-sweep" d="{{ecg.miniPath}}" pathLength="100"/>
+      </svg>
+      <span class="state-text">{{ecg.state}}</span>
+    </div>
+  </header>
+
+  <nav class="ir-tabs">
+    <a data-action="switchTab" data-ir-tab="main" class="{{#if (eq tab 'main')}}active{{/if}}">Survivor</a>
+    <a data-action="switchTab" data-ir-tab="inventory" class="{{#if (eq tab 'inventory')}}active{{/if}}">Inventory</a>
+    <a data-action="switchTab" data-ir-tab="notes" class="{{#if (eq tab 'notes')}}active{{/if}}">Talents &amp; Notes</a>
+  </nav>
+
+  {{#if (or conditions.length isGM)}}
+  <div class="ir-conditions">
+    {{#each conditions}}
+      <span class="ir-cond" data-tooltip="{{tip}}"><img src="{{img}}" alt="">{{name}}
+        {{#if escape}}<a data-action="escape" data-via="athletics" data-tooltip="Strength (Athletics)">Escape: Athletics</a><a data-action="escape" data-via="reflexes" data-tooltip="Agility (Reflexes)">Reflexes</a>{{/if}}
+        {{#if action}}<a data-action="endCondition" data-condition="{{id}}">{{action}}</a>{{/if}}
+        {{#if @root.isGM}}<a class="x" data-action="endCondition" data-condition="{{id}}" data-tooltip="Remove">&#10005;</a>{{/if}}
+      </span>
+    {{else}}<span class="hint">No conditions</span>{{/each}}
+    {{#if isGM}}<button type="button" class="small" data-action="startTurn" data-tooltip="Bleeding, Burning, Adrenaline... (the combat tracker does this automatically)">Start turn</button>{{/if}}
+  </div>
+  {{/if}}
+
+  <section class="ir-body">
+  {{#if (eq tab "main")}}
+    <div class="ir-grid">
+      <!-- LEFT: attributes + survival -->
+      <div class="ir-col">
+        <div class="ir-attributes">
+          {{#each attributes}}
+          <div class="ir-attr">
+            <a class="ir-label rollable" data-action="rollAttribute" data-attribute="{{key}}" title="Roll {{label}}">{{label}}</a>
+            <input type="number" name="system.attributes.{{key}}" value="{{value}}" min="0">
+          </div>
+          {{/each}}
+        </div>
+
+        <div class="ir-box">
+          <h3>Survival</h3>
+          <div class="ir-stat-grid">
+            <div class="ir-stat">
+              <span>Toughness</span>
+              <div><input type="number" name="system.toughness.value" value="{{system.toughness.value}}" min="0"> / <b>{{system.toughness.max}}</b></div>
+            </div>
+            <div class="ir-stat">
+              <span>Defence</span>
+              <div class="ir-big" title="Table {{system.defence.base}} + bonus/gear/health/conditions">{{system.defence.value}}</div>
+            </div>
+            <div class="ir-stat">
+              <span>Adrenaline (max {{system.adrenaline.max}})</span>
+              <div class="ir-pips">
+                {{#each adrenalinePips}}<a class="pip {{#if filled}}filled{{/if}}" data-action="setPip" data-field="system.adrenaline.value" data-n="{{n}}"></a>{{/each}}
+                {{#unless adrenalinePips.length}}<em>none</em>{{/unless}}
+              </div>
+            </div>
+            <div class="ir-stat">
+              <span>Armour</span>
+              <div class="ir-big">{{system.armour.value}}</div>
+            </div>
+          </div>
+          <details class="ir-bonus">
+            <summary>Bonuses (Talents, shields...)</summary>
+            <label>Toughness <input type="number" name="system.toughness.bonus" value="{{system.toughness.bonus}}"></label>
+            <label>Defence <input type="number" name="system.defence.bonus" value="{{system.defence.bonus}}"></label>
+            <label>Armour <input type="number" name="system.armour.bonus" value="{{system.armour.bonus}}"></label>
+          </details>
+        </div>
+
+        <div class="ir-box">
+          <h3>Stress &amp; Panic</h3>
+          <div class="ir-pips stress">
+            {{#each stressPips}}<a class="pip {{#if filled}}filled{{/if}}" data-action="setPip" data-field="system.stress.value" data-n="{{n}}">{{n}}</a>{{/each}}
+            <span class="hint">limit 6</span>
+          </div>
+          <label class="ir-wide">Current Panic Effect <input type="text" name="system.panicEffect" value="{{system.panicEffect}}"></label>
+          <div class="ir-reliefs">
+            <div><a class="box {{#if system.reliefs.moment}}filled{{/if}}" data-action="relief" data-relief="moment"></a> <b>Take a Moment</b> (1d3)</div>
+            <div><a class="box {{#if system.reliefs.minor}}filled{{/if}}" data-action="relief" data-relief="minor"></a>
+              <input type="text" name="system.reliefs.minorText" value="{{system.reliefs.minorText}}" placeholder="Minor relief (1d3)"></div>
+            <div><a class="box {{#if system.reliefs.major}}filled{{/if}}" data-action="relief" data-relief="major"></a>
+              <input type="text" name="system.reliefs.majorText" value="{{system.reliefs.majorText}}" placeholder="Major relief (1d6)"></div>
+          </div>
+          <div class="ir-buttons">
+            <button type="button" data-action="panic">Panic Test</button>
+            <button type="button" data-action="rest">Safe Room Rest</button>
+          </div>
+          <label class="ir-check"><input type="checkbox" name="system.bankedDie" {{checked system.bankedDie}}> Banked die</label>
+        </div>
+      </div>
+
+      <!-- RIGHT: skills -->
+      <div class="ir-col">
+        <div class="ir-box">
+          <h3>Skills <span class="hint">click name to roll</span></h3>
+          <ol class="ir-skills">
+            {{#each skills}}
+            <li>
+              <a class="rollable" data-action="rollSkill" data-skill="{{key}}">{{label}} <small>{{attr}}</small></a>
+              <span class="ir-pips">
+                {{#each pips}}<a class="pip round {{#if filled}}filled{{/if}}" data-action="setPip" data-field="system.skills.{{../key}}.training" data-n="{{n}}"></a>{{/each}}
+              </span>
+            </li>
+            {{/each}}
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="ir-box ir-ecg-box">
+      <h3>ECG Health Tracker <span class="hint">click a box to mark damage</span></h3>
+      <div class="ir-ecg" data-state="{{ecg.state}}">
+        <div class="ecg-zones">
+          {{#each ecg.zones}}<div class="ecg-zone {{key}} {{#if active}}active{{/if}}" style="flex: {{width}}"></div>{{/each}}
+        </div>
+        <svg class="ecg-trace" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="{{ecg.gradId}}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1000" y2="0">
+              {{#each ecg.stops}}<stop offset="{{o}}" stop-color="{{c}}"/>{{/each}}
+            </linearGradient>
+          </defs>
+          <path class="ecg-line" d="{{ecg.path}}" stroke="url(#{{ecg.gradId}})"/>
+          <path class="ecg-sweep" d="{{ecg.path}}" stroke="url(#{{ecg.gradId}})" pathLength="1000"/>
+        </svg>
+        {{#each ecg.boxes}}<a class="ecg-box {{zone}} {{#if filled}}filled{{/if}}" style="left: {{left}}%; top: {{top}}%"
+          data-action="setPip" data-field="system.ecg.value" data-n="{{n}}" data-tooltip="{{tip}}"></a>{{/each}}
+      </div>
+      <div class="ecg-labels">
+        {{#each ecg.zones}}<div class="ecg-label {{key}} {{#if active}}active{{/if}}" style="flex: {{width}}"><b>{{label}}</b><small>{{effect}}</small></div>{{/each}}
+      </div>
+      <div class="ir-buttons">
+        <button type="button" data-action="damage">Take Damage</button>
+        {{#if isGM}}<button type="button" data-action="deathDie">Death Die</button>{{/if}}
+      </div>
+    </div>
+
+    <div class="ir-box">
+      <h3>Combat <a class="ir-add" data-action="createItem" data-type="weapon" title="Add weapon">+</a></h3>
+      <table class="ir-table">
+        <thead><tr><th>Weapon</th><th>Pool</th><th>Dmg</th><th>Shots</th><th>Tags &amp; Range</th><th></th></tr></thead>
+        <tbody>
+        {{#each weapons}}
+          <tr data-item-id="{{item.id}}">
+            <td><a class="rollable" data-action="attack" title="Attack (target a token first)"><img src="{{item.img}}"> {{item.name}}</a></td>
+            <td>{{pool}}d6</td>
+            <td>{{item.system.damage}}</td>
+            <td>{{#if item.system.shots.max}}<input type="number" class="tiny" data-item-field="system.shots.value" value="{{item.system.shots.value}}"> / {{item.system.shots.max}}
+                <a data-action="reload" title="Reload">&#x21bb;</a>{{else}}&ndash;{{/if}}</td>
+            <td class="small">{{item.system.tags}} ({{item.system.range}})</td>
+            <td class="ir-controls"><a data-action="editItem">&#9998;</a><a data-action="deleteItem">&#10005;</a></td>
+          </tr>
+        {{else}}<tr><td colspan="6" class="hint">No weapons. Drag one here or click +.</td></tr>
+        {{/each}}
+        </tbody>
+      </table>
+      <p class="hint">Target an enemy token before attacking: its Defence becomes the TN.</p>
+    </div>
+  {{/if}}
+
+  {{#if (eq tab "inventory")}}
+    <div class="ir-inventory">
+      <div class="inv-case">
+        <div class="inv-title">Inventory</div>
+
+        <div class="inv-band"><span>Quick Items</span>
+          <span class="inv-count">{{inv.quickUsed}} / {{system.quickSlots.total}}
+            <small>base</small> <input type="number" class="tiny" name="system.quickSlots.max" value="{{system.quickSlots.max}}" min="0" max="4" data-tooltip="Base Quick Item Slots{{#if system.quickSlots.bonus}} (+{{system.quickSlots.bonus}} from gear){{/if}}"></span></div>
+        <div class="inv-quick">
+          {{#each inv.quick}}
+          <div class="quick-cell {{#if locked}}locked{{/if}}" data-index="{{i}}">
+            {{#if tile}}<div class="inv-tile {{tile.type}} {{#if tile.selected}}selected{{/if}}" data-item-id="{{tile.id}}" data-action="selectItem" draggable="true" data-tooltip="{{tile.name}}">
+              <img src="{{tile.img}}" alt=""><span class="tile-name">{{tile.name}}</span>{{#if tile.badge}}<span class="tile-badge">{{tile.badge}}</span>{{/if}}{{#if tile.ready}}<span class="tile-worn ready">Ready</span>{{/if}}</div>{{/if}}
+          </div>
+          {{/each}}
+        </div>
+
+        {{#if inv.heavyOver}}<p class="inv-warn">Carrying {{inv.heavy}} Heavy weapons: the limit is your Strength ({{inv.strength}}).</p>{{/if}}
+        <div class="inv-band"><span>Stored</span>
+          <span class="inv-count {{#if system.slots.over}}over{{/if}}">{{system.slots.used}} / {{system.slots.total}}
+            <small>base</small> <input type="number" class="tiny" name="system.slots.max" value="{{system.slots.max}}" min="0" max="12" data-tooltip="Base Inventory Slots{{#if system.slots.bonus}} (+{{system.slots.bonus}} from gear){{/if}}"></span></div>
+        <div class="inv-grid">
+          {{#each inv.cells}}<div class="inv-cell {{#if locked}}locked{{/if}}" data-i="{{i}}" style="grid-column: {{col}}; grid-row: {{row}}"></div>{{/each}}
+          {{#each inv.tiles}}
+          <div class="inv-tile {{type}} {{#if selected}}selected{{/if}} {{#if rot}}rot{{/if}}" data-item-id="{{id}}" data-action="selectItem" draggable="true"
+            data-w="{{w}}" data-h="{{h}}" data-tooltip="{{name}}" style="grid-column: {{col}} / span {{w}}; grid-row: {{row}} / span {{h}}; --w: {{w}}; --h: {{h}}">
+            <img src="{{img}}" alt=""><span class="tile-name">{{name}}</span>{{#if badge}}<span class="tile-badge">{{badge}}</span>{{/if}}
+            {{#if ready}}<span class="tile-worn ready" data-tooltip="Ready">Ready</span>{{/if}}
+          </div>
+          {{/each}}
+        </div>
+
+        <div class="inv-band"><span>Worn</span><span class="inv-count">Armour {{system.armour.value}}</span></div>
+        <div class="inv-worn" data-index="0">
+          {{#each inv.worn}}<div class="inv-tile armour {{#if selected}}selected{{/if}}" data-item-id="{{id}}" data-action="selectItem" draggable="true" data-tooltip="{{name}}">
+            <img src="{{img}}" alt=""><span class="tile-name">{{name}}</span><span class="tile-badge">{{badge}}</span></div>
+          {{else}}<span class="hint">Drag armour here to wear it (worn armour uses no Slots)</span>{{/each}}
+        </div>
+      </div>
+
+      <div class="inv-side">
+        <div class="inv-examine" {{#if inv.selected}}data-item-id="{{inv.selected.item.id}}"{{/if}}>
+          <div class="inv-title">Examine</div>
+          {{#with inv.selected}}
+            <div class="exam-art"><img src="{{item.img}}" alt=""></div>
+            <h4>{{item.name}}</h4>
+            <div class="exam-meta">{{meta}}</div>
+            {{#if isWeapon}}{{#if system.tags}}<div class="exam-tags">{{system.tags}}</div>{{/if}}{{/if}}
+            <div class="exam-fields">
+              {{#if isGear}}<label>Qty <input type="number" class="tiny" data-item-field="system.quantity" value="{{system.quantity}}" min="0"></label>{{/if}}
+              {{#if canReload}}<label>Shots <input type="number" class="tiny" data-item-field="system.shots.value" value="{{system.shots.value}}" min="0"> / {{system.shots.max}}</label>{{/if}}
+            </div>
+            {{#if system.description}}<div class="exam-desc">{{system.description}}</div>{{/if}}
+            <div class="exam-buttons">
+              {{#if isWeapon}}<button type="button" data-action="attack">Attack</button>{{/if}}
+              {{#if canReload}}<button type="button" data-action="reload">Reload</button>{{/if}}
+              {{#if canUse}}<button type="button" data-action="useItem">Use</button>{{/if}}
+              {{#if canReady}}<button type="button" data-action="readyGear" data-tooltip="Ready gives its Defence / Reflexes bonus">{{#if system.ready}}Put away{{else}}Ready{{/if}}</button>{{/if}}
+              {{#if isArmour}}<button type="button" data-action="wearArmour">{{#if system.equipped}}Take off{{else}}Wear{{/if}}</button>{{/if}}
+              {{#if @root.boxOpen}}<button type="button" data-action="storeItem" data-tooltip="Put it in the Safe Room Item Box">Store</button>{{/if}}
+              {{#if canRotate}}<button type="button" data-action="rotateItem">&#x21bb; Rotate</button>{{/if}}
+              <button type="button" data-action="editItem">Edit</button>
+              <button type="button" data-action="deleteItem">Discard</button>
+            </div>
+          {{else}}
+            <p class="hint">Click an item to examine it. Drag items to move them, between the grid and Quick Slots too.
+              Double-click opens the item sheet. Drop items from the sidebar straight onto a slot.</p>
+          {{/with}}
+        </div>
+
+        {{#if inv.loose.length}}
+        <div class="inv-tray {{#if inv.hasOverflow}}over{{/if}}">
+          <div class="inv-band"><span>Not in the grid</span></div>
+          {{#each inv.loose}}
+          <div class="tray-row {{#if over}}over{{/if}}">
+            <div class="inv-tile {{type}} {{#if selected}}selected{{/if}}" data-item-id="{{id}}" data-action="selectItem" draggable="true" data-tooltip="{{name}}">
+              <img src="{{img}}" alt="">{{#if badge}}<span class="tile-badge">{{badge}}</span>{{/if}}</div>
+            <span class="tray-name">{{name}}</span><span class="tray-reason">{{#if bonus}}{{bonus}}{{else}}{{reason}}{{/if}}</span>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+
+        {{#if boxOpen}}
+        <div class="inv-itembox {{#if safeRoom}}open{{/if}}" data-index="0">
+          <div class="box-lid"></div>
+          <div class="box-text"><b>Item Box</b>
+            <small>Drop items here to stash them. Only the GM knows what's inside.</small></div>
+        </div>
+        {{/if}}
+
+        <div class="inv-add">
+          <button type="button" data-action="createItem" data-type="gear">+ Gear</button>
+          <button type="button" data-action="createItem" data-type="weapon">+ Weapon</button>
+          <button type="button" data-action="createItem" data-type="armour">+ Armour</button>
+        </div>
+        <p class="hint">Quick items and worn armour don't use Slots. Base 4 Slots (max 12) and 2 Quick Slots (max 4). Gear like a Backpack adds Slots while carried.</p>
+      </div>
+    </div>
+  {{/if}}
+
+  {{#if (eq tab "notes")}}
+    <div class="ir-box">
+      <h3>Talents <a class="ir-add" data-action="createItem" data-type="talent" title="Add talent">+</a></h3>
+      {{#each talents}}
+        <div class="ir-talent" data-item-id="{{id}}">
+          <div class="ir-talent-head"><b>{{name}}</b>
+            <span class="ir-controls"><a data-action="editItem">&#9998;</a><a data-action="deleteItem">&#10005;</a></span></div>
+          <div class="small">{{system.description}}</div>
+        </div>
+      {{else}}<p class="hint">No talents yet. Tip: Hard to Kill = +2 Toughness bonus, Nimble = +1 Defence bonus.</p>
+      {{/each}}
+    </div>
+    <div class="ir-box">
+      <h3>Details</h3>
+      <div class="ir-row">
+        <label>Height <input type="text" name="system.details.height" value="{{system.details.height}}"></label>
+        <label>Weight <input type="text" name="system.details.weight" value="{{system.details.weight}}"></label>
+        <label>Eyes <input type="text" name="system.details.eyes" value="{{system.details.eyes}}"></label>
+        <label>Hair <input type="text" name="system.details.hair" value="{{system.details.hair}}"></label>
+      </div>
+      <label class="ir-wide">Description<textarea name="system.details.description" rows="4">{{system.details.description}}</textarea></label>
+      <label class="ir-wide">Notes &amp; Other Possessions<textarea name="system.notes" rows="8">{{system.notes}}</textarea></label>
+    </div>
+  {{/if}}
+  </section>
+</div>

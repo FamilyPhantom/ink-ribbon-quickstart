@@ -1,0 +1,35 @@
+name: Release System
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set manifest URLs from the release tag
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          REPO="${{ github.repository }}"
+          jq --arg v "$VERSION" \
+             --arg url "https://github.com/$REPO" \
+             --arg manifest "https://github.com/$REPO/releases/latest/download/system.json" \
+             --arg download "https://github.com/$REPO/releases/download/$TAG/ink-ribbon.zip" \
+             '.version=$v | .url=$url | .manifest=$manifest | .download=$download' \
+             system.json > system.tmp && mv system.tmp system.json
+
+      - name: Build zip (system.json at root)
+        run: zip -r ink-ribbon.zip . -x ".git/*" ".github/*" ".gitignore" "*.zip"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            system.json
+            ink-ribbon.zip

@@ -1,0 +1,51 @@
+{
+  "id": "ink-ribbon",
+  "title": "Ink Ribbon (Quick Start)",
+  "description": "Unofficial fan-made helper system for running the Ink Ribbon Quick Start Demo (Dead on Arrival). Rules text not included.",
+  "version": "0.4.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "Conrad"
+    }
+  ],
+  "esmodules": [
+    "ink-ribbon.mjs"
+  ],
+  "styles": [
+    "styles/ink-ribbon.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "documentTypes": {
+    "Actor": {
+      "character": {},
+      "monster": {},
+      "npc": {},
+      "storage": {}
+    },
+    "Item": {
+      "weapon": {},
+      "armour": {},
+      "gear": {},
+      "talent": {},
+      "attack": {}
+    }
+  },
+  "primaryTokenAttribute": "toughness",
+  "secondaryTokenAttribute": "adrenaline",
+  "grid": {
+    "type": 1,
+    "distance": 5,
+    "units": "ft"
+  },
+  "socket": true
+}

@@ -1,0 +1,72 @@
+<div class="ir-sheet">
+  <header class="ir-header">
+    <img class="ir-portrait small" src="{{item.img}}" data-action="editImage" data-edit="img" title="{{item.name}}">
+    <div class="ir-identity">
+      <input class="ir-name" type="text" name="name" value="{{item.name}}">
+      <span class="hint">{{localize (concat "TYPES.Item." type)}}</span>
+    </div>
+  </header>
+
+  <section class="ir-body ir-form">
+    {{#if isType.weapon}}
+      <div class="form-group"><label>Type</label><select name="system.category">{{selectOptions categories selected=system.category}}</select></div>
+      <div class="form-group"><label>Damage</label><input type="number" name="system.damage" value="{{system.damage}}" min="0"></div>
+      <div class="form-group"><label>Range</label><select name="system.range">{{selectOptions ranges selected=system.range}}</select></div>
+      <div class="form-group"><label>Shots (current / max)</label>
+        <input type="number" name="system.shots.value" value="{{system.shots.value}}" min="0">
+        <input type="number" name="system.shots.max" value="{{system.shots.max}}" min="0"></div>
+      <div class="form-group"><label>Tags</label><input type="text" name="system.tags" value="{{system.tags}}" placeholder="Loud, Up Close"></div>
+      <div class="form-group"><label>Ammo item (Reload uses it)</label><input type="text" name="system.ammo" value="{{system.ammo}}" placeholder="Handgun Ammo"></div>
+      <div class="form-group"><label>Single use (used up when thrown)</label><input type="checkbox" name="system.singleUse" {{checked system.singleUse}}></div>
+      <p class="hint">Automated tags: Brittle, Inferior, Explosive, Spray, Blaze, Full-auto, Up Close, Two-handed, Thrown (Range), Heavy, Loud (reminder).
+        Ammo must match the gear item's name exactly.</p>
+    {{/if}}
+
+    {{#if isType.armour}}
+      <div class="form-group"><label>Armour Rating</label><input type="number" name="system.rating" value="{{system.rating}}" min="0"></div>
+      <div class="form-group"><label>Worn</label><input type="checkbox" name="system.equipped" {{checked system.equipped}}></div>
+    {{/if}}
+
+    {{#if isType.gear}}
+      <div class="form-group"><label>Quantity</label><input type="number" name="system.quantity" value="{{system.quantity}}" min="0"></div>
+      <div class="form-group"><label>+ Inventory Slots (while carried)</label><input type="number" name="system.slotBonus" value="{{system.slotBonus}}" min="0" max="12"></div>
+      <div class="form-group"><label>+ Quick Item Slots (while carried)</label><input type="number" name="system.quickBonus" value="{{system.quickBonus}}" min="0" max="4"></div>
+      <div class="form-group"><label>+ Defence (while ready)</label><input type="number" name="system.defenceBonus" value="{{system.defenceBonus}}" min="-6" max="6"></div>
+      <div class="form-group"><label>+ Reflexes dice (while ready)</label><input type="number" name="system.reflexesBonus" value="{{system.reflexesBonus}}" min="0" max="6"></div>
+      <div class="form-group"><label>Ready (held)</label><input type="checkbox" name="system.ready" {{checked system.ready}}></div>
+      <div class="form-group"><label>Use effect</label><select name="system.use">{{selectOptions useOptions selected=system.use}}</select></div>
+      {{#if (eq system.use "heal")}}
+        <div class="form-group"><label>ECG boxes cleared</label><input type="number" name="system.healEcg" value="{{system.healEcg}}" min="0"></div>
+        <p class="hint">Lesser herb 0, Basic 1, Improved 2, Advanced 3, First-Aid Spray 2.</p>
+      {{/if}}
+    {{/if}}
+
+    {{#if isType.attack}}
+      <div class="form-group"><label>Kind</label><select name="system.kind">{{selectOptions kinds selected=system.kind}}</select></div>
+      <div class="form-group"><label>Dice pool (d6)</label><input type="number" name="system.pool" value="{{system.pool}}" min="0"></div>
+      <div class="form-group"><label>Damage</label><input type="number" name="system.damage" value="{{system.damage}}" min="0"></div>
+      <div class="form-group"><label>Range</label><select name="system.range">{{selectOptions ranges selected=system.range}}</select></div>
+      <div class="form-group"><label>Conditions on a hit (offered as buttons)</label><input type="text" name="system.conditions" value="{{system.conditions}}" placeholder="caught, prone"></div>
+      <div class="form-group"><label>Lethal (would-be Dying = dead)</label><input type="checkbox" name="system.lethal" {{checked system.lethal}}></div>
+      <div class="form-group"><label>No Test (just deals its damage)</label><input type="checkbox" name="system.noTest" {{checked system.noTest}}></div>
+    {{/if}}
+
+    {{#if isType.talent}}
+      <div class="form-group"><label>Ignore Stress</label><input type="number" name="system.ignoreStress" value="{{system.ignoreStress}}" min="0" max="6"></div>
+      <div class="form-group"><label>...on these skills</label><input type="text" name="system.ignoreSkills" value="{{system.ignoreSkills}}" placeholder="fighting, shooting"></div>
+      <div class="form-group"><label>+ Toughness</label><input type="number" name="system.toughness" value="{{system.toughness}}"></div>
+      <div class="form-group"><label>+ Defence</label><input type="number" name="system.defence" value="{{system.defence}}"></div>
+      <div class="form-group"><label>+ Advantage dice</label><input type="number" name="system.advantage" value="{{system.advantage}}" min="0"></div>
+      <div class="form-group"><label>...on this skill / when</label><span class="pair"><input type="text" name="system.advSkill" value="{{system.advSkill}}" placeholder="reflexes"><input type="text" name="system.advNote" value="{{system.advNote}}" placeholder="to dodge"></span></div>
+      <p class="hint">Skill keys: lowercase skill names (fighting, shooting, medicine, reflexes...). Bonuses apply automatically.</p>
+    {{/if}}
+
+    {{#unless (or isType.talent isType.attack)}}
+      <div class="form-group"><label>Size (Slots)</label><input type="number" name="system.size" value="{{system.size}}" min="0"></div>
+      <div class="form-group"><label>In a Quick Item Slot</label><input type="checkbox" name="system.quick" {{checked system.quick}}></div>
+    {{/unless}}
+
+    <label class="ir-wide">{{#if isType.attack}}Effect{{else}}Description{{/if}}
+      <textarea name="system.description" rows="6">{{system.description}}</textarea></label>
+  </section>
+</div>

@@ -1,0 +1,131 @@
+<div class="ir-sheet">
+  <header class="ir-header">
+    <img class="ir-portrait" src="{{actor.img}}" data-action="editImage" data-edit="img" title="{{actor.name}}">
+    <div class="ir-identity">
+      <input class="ir-name" type="text" name="name" value="{{actor.name}}" placeholder="Name">
+      <div class="ir-row">
+        <select name="system.enemyType">{{selectOptions enemyTypes selected=system.enemyType}}</select>
+        <input type="text" name="system.tags" value="{{system.tags}}" placeholder="Infected">
+      </div>
+    </div>
+  </header>
+
+  <div class="ir-conditions">
+    {{#each conditions}}
+      <span class="ir-cond" data-tooltip="{{tip}}"><img src="{{img}}" alt="">{{name}}
+        {{#if action}}<a data-action="endCondition" data-condition="{{id}}">{{action}}</a>{{/if}}
+        {{#if @root.isGM}}<a class="x" data-action="endCondition" data-condition="{{id}}" data-tooltip="Remove">&#10005;</a>{{/if}}
+      </span>
+    {{else}}<span class="hint">No conditions</span>{{/each}}
+    {{#if isGM}}<button type="button" class="small" data-action="startTurn" data-tooltip="Self Healing, Adrenaline, Bleeding, Burning, Back From the Dead (the combat tracker does this automatically)">Start turn</button>{{/if}}
+  </div>
+
+  <section class="ir-body">
+    <div class="ir-statblock">
+      {{#each attributes}}
+      <div><a class="rollable" data-action="rollAttribute" data-attribute="{{key}}">{{label}}</a>
+        <input type="number" name="system.attributes.{{key}}" value="{{value}}" min="0"></div>
+      {{/each}}
+      <div><span>Toughness</span>
+        <span class="pair"><input type="number" name="system.toughness.value" value="{{system.toughness.value}}" min="0">/<input type="number" name="system.toughness.max" value="{{system.toughness.max}}" min="0"></span></div>
+      <div><span>Health</span>
+        <span class="pair"><input type="number" name="system.health.value" value="{{system.health.value}}" min="0">/<input type="number" name="system.health.max" value="{{system.health.max}}" min="0"></span></div>
+      <div><span>Adrenaline</span>
+        <span class="pair"><input type="number" name="system.adrenaline.value" value="{{system.adrenaline.value}}" min="0">/<input type="number" name="system.adrenaline.max" value="{{system.adrenaline.max}}" min="0"></span></div>
+      <div><span>Def (Armour)</span>
+        <span class="pair"><input type="number" name="system.defence.base" value="{{system.defence.base}}" min="1" title="Base Defence">(<input type="number" name="system.armour.value" value="{{system.armour.value}}" min="0">)</span>
+        {{#unless (eq system.defence.value system.defence.base)}}<small>now {{system.defence.value}}</small>{{/unless}}</div>
+    </div>
+    <p class="hint">Health max 0 = no Health (Horde: dies at 0 Toughness). Boss/Nemesis die when both are 0.</p>
+
+    {{#if traitSummary.length}}<div class="ir-traitline">{{#each traitSummary}}<span>{{this}}</span>{{/each}}</div>{{/if}}
+    {{#if (or hasFear system.weak.max)}}
+    <div class="ir-buttons ir-specials">
+      {{#if system.traits.grotesque}}<button type="button" data-action="fearFirst" data-tooltip="Selected survivors (or all in the scene): 1 Stress + Panic Test">First sighting</button>
+        <button type="button" data-action="fearLater" data-tooltip="TN 4 Heart (Willpower) or 1 Stress">Later sighting</button>{{/if}}
+      {{#if system.traits.roar}}<button type="button" data-action="roar" data-tooltip="TN 5 Heart (Willpower) or 1 Stress">Terrifying Roar</button>{{/if}}
+      {{#if system.weak.max}}<span class="ir-weak" data-tooltip="Attackers can tick 'Target {{system.weak.label}}' in their attack dialog">{{system.weak.label}}:
+        {{#each weakPips}}<i class="{{#if this}}on{{/if}}"></i>{{/each}}</span>{{/if}}
+    </div>
+    {{/if}}
+
+    <div class="ir-box">
+      <h3>Attacks <a class="ir-add" data-action="createItem" data-type="attack" title="Add attack">+</a></h3>
+      <table class="ir-table">
+        <thead><tr><th>Attack</th><th>Pool</th><th>Dmg</th><th>Range</th><th></th></tr></thead>
+        <tbody>
+        {{#each attacks}}
+          <tr data-item-id="{{id}}">
+            <td><a class="rollable" data-action="attack" title="Roll (target a token first)">{{name}}</a>
+              {{#if system.lethal}}<span class="ir-tag red">Lethal</span>{{/if}}{{#if system.noTest}}<span class="ir-tag">No Test</span>{{/if}}
+              {{#if system.conditions}}<span class="ir-tag">{{system.conditions}}</span>{{/if}}
+              {{#if system.description}}<div class="small">{{system.description}}</div>{{/if}}</td>
+            <td>{{#if system.noTest}}&ndash;{{else}}{{system.pool}}d6{{/if}}</td>
+            <td>{{system.damage}}</td>
+            <td>{{system.range}}</td>
+            <td class="ir-controls"><a data-action="editItem">&#9998;</a><a data-action="deleteItem">&#10005;</a></td>
+          </tr>
+        {{else}}<tr><td colspan="5" class="hint">Add the stat block's attacks, e.g. Bite: Melee [4d6], 2 damage.</td></tr>
+        {{/each}}
+        </tbody>
+      </table>
+      <div class="ir-buttons"><button type="button" data-action="damage">Take Damage</button></div>
+    </div>
+
+    <details class="ir-box ir-traits">
+      <summary><h3>Traits (automated)</h3></summary>
+      <div class="ir-trait-grid">
+        <label>Defence vs ranged <input type="number" name="system.traits.vsRanged" value="{{system.traits.vsRanged}}"></label>
+        <label>Defence vs melee <input type="number" name="system.traits.vsMelee" value="{{system.traits.vsMelee}}"></label>
+        <label>Adrenaline / turn <input type="number" name="system.traits.adrenalineRegen" value="{{system.traits.adrenalineRegen}}" min="0"></label>
+        <label>Self Healing / round <input type="number" name="system.traits.selfHeal" value="{{system.traits.selfHeal}}" min="0"></label>
+        <label><input type="checkbox" name="system.traits.aimForHead" {{checked system.traits.aimForHead}}> Aim For the Head</label>
+        <label><input type="checkbox" name="system.traits.backFromDead" {{checked system.traits.backFromDead}}> Back From the Dead
+          (<input type="checkbox" name="system.traits.bftdUsed" {{checked system.traits.bftdUsed}} data-tooltip="Already used"> used)</label>
+        <label><input type="checkbox" name="system.traits.actsLast" {{checked system.traits.actsLast}}> Always acts last</label>
+        <label><input type="checkbox" name="system.traits.extraTurn" {{checked system.traits.extraTurn}}> My Turn (extra turn)</label>
+        <label><input type="checkbox" name="system.traits.horrorOnAppear" {{checked system.traits.horrorOnAppear}}> Horror +1 when it appears</label>
+        <label><input type="checkbox" name="system.traits.grotesque" {{checked system.traits.grotesque}}> Grotesque</label>
+        <label><input type="checkbox" name="system.traits.roar" {{checked system.traits.roar}}> Terrifying Roar</label>
+        <label>Mutates into <input type="text" name="system.traits.mutatesInto" value="{{system.traits.mutatesInto}}" placeholder="Mutated Dog">
+          (<input type="checkbox" name="system.traits.mutationChecked" {{checked system.traits.mutationChecked}} data-tooltip="Already checked"> checked)</label>
+      </div>
+      <h4 class="box-section">Weak point</h4>
+      <div class="ir-trait-grid">
+        <label>Name <input type="text" name="system.weak.label" value="{{system.weak.label}}" placeholder="Unstable Chemicals"></label>
+        <label>Left / max <span class="pair"><input type="number" name="system.weak.count" value="{{system.weak.count}}" min="0">/<input type="number" name="system.weak.max" value="{{system.weak.max}}" min="0"></span></label>
+        <label>TN to target <input type="number" name="system.weak.tn" value="{{system.weak.tn}}" min="2" max="6"></label>
+        <label>Bursts at damage <input type="number" name="system.weak.threshold" value="{{system.weak.threshold}}" min="1"></label>
+        <label>Damage to itself <input type="number" name="system.weak.selfDamage" value="{{system.weak.selfDamage}}" min="0"></label>
+        <label>Condition on itself <select name="system.weak.selfCondition">{{selectOptions conditionOptions selected=system.weak.selfCondition}}</select></label>
+        <label>...for rounds <input type="text" name="system.weak.selfRounds" value="{{system.weak.selfRounds}}" placeholder="1d6"></label>
+        <label>Adjacent damage <input type="number" name="system.weak.splashDamage" value="{{system.weak.splashDamage}}" min="0"></label>
+        <label>Adjacent condition <select name="system.weak.splashCondition">{{selectOptions conditionOptions selected=system.weak.splashCondition}}</select></label>
+      </div>
+    </details>
+
+    <details class="ir-box" {{#unless trainedSkills.length}}open{{/unless}}>
+      <summary><h3>Skills (bonus dice)</h3></summary>
+      <ol class="ir-skills">
+        {{#each skills}}
+        <li><a class="rollable" data-action="rollSkill" data-skill="{{key}}">{{label}} <small>{{attr}}</small></a>
+          <input type="number" class="tiny" name="system.skills.{{key}}.training" value="{{training}}" min="0"></li>
+        {{/each}}
+      </ol>
+    </details>
+    {{#if trainedSkills.length}}
+      <p class="small"><b>Skills:</b> {{#each trainedSkills}}{{label}} [+{{training}}d6]{{#unless @last}}, {{/unless}}{{/each}}</p>
+    {{/if}}
+
+    <div class="ir-box ir-abilities">
+      <h3>Abilities <a class="ir-add" data-action="toggleAbilities" data-tooltip="{{#if editAbilities}}Done{{else}}Edit{{/if}}">{{#if editAbilities}}&#10003;{{else}}&#9998;{{/if}}</a></h3>
+      {{#if editAbilities}}
+        <textarea name="system.abilities" rows="9" placeholder="One ability per line, e.g. Fast: moves one extra Zone.">{{system.abilities}}</textarea>
+        <p class="hint">One ability per line. Text before the first colon is shown in bold.</p>
+      {{else}}
+        {{#if abilitiesHtml}}{{{abilitiesHtml}}}{{else}}<p class="hint">No abilities. Click &#9998; to add some.</p>{{/if}}
+      {{/if}}
+    </div>
+    <label class="ir-wide"><h3>GM Notes</h3><textarea name="system.notes" rows="4">{{system.notes}}</textarea></label>
+  </section>
+</div>

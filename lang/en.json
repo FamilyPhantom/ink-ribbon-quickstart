@@ -1,0 +1,17 @@
+{
+  "TYPES": {
+    "Actor": {
+      "character": "Survivor (PC)",
+      "monster": "Monster",
+      "npc": "NPC",
+      "storage": "Safe Room Item Box"
+    },
+    "Item": {
+      "weapon": "Weapon",
+      "armour": "Armour",
+      "gear": "Gear",
+      "talent": "Talent",
+      "attack": "Monster Attack"
+    }
+  }
+}
