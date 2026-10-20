@@ -138,6 +138,12 @@ function tileFor(item, selectedId, extra = {}) {
   };
 }
 
+/** Tile view data (name, image, corner badge) for a list of items, e.g. for an add-on's item panel. */
+export function itemTiles(items) {
+  return [...items].filter(i => PACKABLE.includes(i.type)).sort((a, b) => a.name.localeCompare(b.name))
+    .map(i => ({ id: i.id, name: i.name, img: i.img, type: i.type, badge: badgeFor(i) }));
+}
+
 /** View data for the template. */
 export function inventoryContext(actor, selectedId) {
   const r = resolveInventory(actor);

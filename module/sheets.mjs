@@ -2,10 +2,16 @@ import { ATTRIBUTES, SKILLS, CONDITIONS } from "./config.mjs";
 import { removeCondition, manualTurn, grotesque, roar } from "./rules.mjs";
 import { ecgContext } from "./ecg.mjs";
 import { PACKABLE, COLS, shapeOf, resolveInventory, placementUpdate, inventoryContext } from "./inventory.mjs";
-import { storeItem, giveItem, isSafeRoomOpen, toggleSafeRoom } from "./itembox.mjs";
 
 /** The item currently being dragged out of an inventory grid (shared by all open sheets). */
-const invDrag = { current: null };
+/**
+ * The item being dragged onto an inventory grid (shared by all open sheets).
+ * Add-on modules can start their own drags by setting `current` to
+ *   { foreign: true, item, onDrop: (sheet, placement) => ... }
+ * The grid then highlights the item's footprint and, on drop, hands over a checked placement:
+ *   { zone: "grid", x, y, rot } | { zone: "quick", index } | { zone: "worn" }
+ */
+export const invDrag = { current: null };
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2, ItemSheetV2 } = foundry.applications.sheets;
@@ -188,8 +194,7 @@ export class InkCharacterSheet extends InkActorSheet {
       selectItem: InkCharacterSheet.#onSelectItem,
       rotateItem: InkCharacterSheet.#onRotateItem,
       wearArmour: InkCharacterSheet.#onWearArmour,
-      readyGear: InkCharacterSheet.#onReadyGear,
-      storeItem: InkCharacterSheet.#onStoreItem
+      readyGear: InkCharacterSheet.#onReadyGear
     }
   };
   static PARTS = { sheet: { template: `${PATH}/character.hbs`, scrollable: [".ir-body"] } };
@@ -206,8 +211,6 @@ export class InkCharacterSheet extends InkActorSheet {
     ctx.adrenalinePips = Array.from({ length: s.adrenaline.max }, (_, i) => ({ n: i + 1, filled: i < s.adrenaline.value }));
     ctx.useOptions = { none: "No auto effect", heal: "Heal (herb / spray)", healthpack: "Health Pack", adrenaline: "Adrenaline Shot" };
     if (this.tab === "inventory") ctx.inv = inventoryContext(this.document, this.selectedItemId);
-    ctx.boxOpen = isSafeRoomOpen();             // Item Box + Store only appear in a Safe Room (GM uses the Box button otherwise)
-    ctx.safeRoom = isSafeRoomOpen();
     return ctx;
   }
 
@@ -258,11 +261,6 @@ export class InkCharacterSheet extends InkActorSheet {
     if (item?.type === "gear") item.update({ "system.ready": !item.system.ready });
   }
 
-  static #onStoreItem(event, target) {
-    const item = this.document.items.get(target.closest("[data-item-id]")?.dataset.itemId);
-    if (item) { this.selectedItemId = null; storeItem(item); }
-  }
-
   /* ---------------- Inventory: drag & drop ---------------- */
 
   #bindInventory() {
@@ -271,7 +269,7 @@ export class InkCharacterSheet extends InkActorSheet {
     const grid = root.querySelector(".inv-grid");
 
     // Drag sources: every item tile.
-    for (const tile of root.querySelectorAll(".inv-tile")) {
+    for (const tile of root.querySelectorAll(".inv-tile[data-item-id]")) {
       tile.addEventListener("dragstart", ev => {
         const item = this.document.items.get(tile.dataset.itemId);
         if (!item) return;
@@ -313,9 +311,9 @@ export class InkCharacterSheet extends InkActorSheet {
       });
     }
 
-    // Drop targets: Quick Item Slots, the Worn armour slot and the Safe Room Item Box.
-    for (const el of root.querySelectorAll(".quick-cell, .inv-worn, .inv-itembox")) {
-      const zone = el.classList.contains("inv-itembox") ? "box" : el.classList.contains("inv-worn") ? "worn" : "quick";
+    // Drop targets: Quick Item Slots and the Worn armour slot.
+    for (const el of root.querySelectorAll(".quick-cell, .inv-worn")) {
+      const zone = el.classList.contains("inv-worn") ? "worn" : "quick";
       el.addEventListener("dragover", ev => { ev.preventDefault(); ev.stopPropagation(); el.classList.add("drop-hover"); });
       el.addEventListener("dragleave", () => el.classList.remove("drop-hover"));
       el.addEventListener("drop", ev => {
@@ -331,8 +329,8 @@ export class InkCharacterSheet extends InkActorSheet {
     const rect = grid.getBoundingClientRect();
     const cx = Math.floor((ev.clientX - rect.left) / (rect.width / COLS));
     const cy = Math.floor((ev.clientY - rect.top) / (rect.height / 3));
-    const drag = invDrag.current?.actorUuid === this.document.uuid ? invDrag.current : null;
-    const item = drag && this.document.items.get(drag.id);
+    const drag = invDrag.current?.foreign || invDrag.current?.actorUuid === this.document.uuid ? invDrag.current : null;
+    const item = drag?.foreign ? drag.item : drag && this.document.items.get(drag.id);
     const x = cx - (drag?.dx ?? 0), y = cy - (drag?.dy ?? 0);
     if (!item) return { x, y, shape: { w: 1, h: 1 }, ok: true };
     const r = resolveInventory(this.document);
@@ -350,6 +348,9 @@ export class InkCharacterSheet extends InkActorSheet {
     }
   }
 
+  /** Public so add-on modules can clear the drop highlight when their drag ends. */
+  clearDropHighlight() { this.#clearHighlight(); }
+
   #clearHighlight() {
     for (const el of this.element.querySelectorAll(".drop-ok, .drop-bad, .drop-hover")) el.classList.remove("drop-ok", "drop-bad", "drop-hover");
   }
@@ -357,13 +358,14 @@ export class InkCharacterSheet extends InkActorSheet {
   async #onInvDrop(ev, zone, target) {
     const drag = invDrag.current;
     invDrag.current = null;
-    let item = drag?.actorUuid === this.document.uuid ? this.document.items.get(drag.id) : null;
 
-    // Item Box: only this survivor's own items can be stashed from here.
-    if (zone === "box") {
-      if (item) { this.selectedItemId = null; return storeItem(item); }
-      return ui.notifications.warn("Drag one of this survivor's items into the Item Box.");
+    // A drag started by an add-on module: check the spot, then let the module do the move.
+    if (drag?.foreign) {
+      const placement = this.#placementFor(drag.item, zone, target);
+      if (placement) return drag.onDrop?.(this, placement);
+      return;
     }
+    let item = drag?.actorUuid === this.document.uuid ? this.document.items.get(drag.id) : null;
 
     // Dropped from the sidebar, a compendium or another actor: copy it onto this actor first.
     if (!item) {
@@ -373,12 +375,6 @@ export class InkCharacterSheet extends InkActorSheet {
       if (!source) return;
       if (!PACKABLE.includes(source.type)) return ui.notifications.warn("Only weapons, armour and gear go in the inventory.");
       if (source.parent === this.document) item = source;
-      else if (source.parent?.type === "storage") {
-        // GM dragging out of the Item Box: a move, not a copy.
-        if (!game.user.isGM) return;
-        await giveItem(source, this.document);
-        return;
-      }
       else {
         const obj = source.toObject();
         delete obj._id;
@@ -390,6 +386,29 @@ export class InkCharacterSheet extends InkActorSheet {
       }
     }
     return this._moveItem(item, zone, target);
+  }
+
+  /** Where an item not yet on this survivor would land (null + warning if it can't go there). */
+  #placementFor(item, zone, target) {
+    const r = resolveInventory(this.document);
+    if (zone === "grid") {
+      const rot = item.system.inv?.rot ?? false;
+      for (const rr of item.system.size > 1 ? [rot, !rot] : [rot]) {
+        if (r.grid.fits(target.x, target.y, shapeOf(item, rr))) return { zone: "grid", x: target.x, y: target.y, rot: rr };
+      }
+      ui.notifications.warn(`${item.name} doesn't fit there.`);
+      return null;
+    }
+    if (zone === "quick") {
+      if (target.index >= r.qmax || r.quick[target.index]) { ui.notifications.warn("That Quick Item Slot isn't free."); return null; }
+      if (item.type === "weapon" && item.system.hasTag?.("Heavy")) { ui.notifications.warn(`${item.name} is Heavy: it can't go in a Quick Item Slot.`); return null; }
+      return { zone: "quick", index: target.index };
+    }
+    if (zone === "worn") {
+      if (item.type !== "armour") { ui.notifications.warn("Only armour can be worn."); return null; }
+      return { zone: "worn" };
+    }
+    return null;
   }
 
   /**
@@ -490,58 +509,6 @@ export class InkMonsterSheet extends InkActorSheet {
     ctx.conditionOptions = Object.fromEntries([["", "None"], ...CONDITIONS.map(c => [c.id, c.name])]);
     return ctx;
   }
-}
-
-/* -------------------------------------------- */
-/*  Safe Room Item Box (GM only)                */
-/* -------------------------------------------- */
-
-export class InkStorageSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
-  static DEFAULT_OPTIONS = {
-    classes: ["ink-ribbon", "sheet", "actor", "storage"],
-    position: { width: 560, height: 640 },
-    window: { resizable: true },
-    form: { submitOnChange: true },
-    actions: {
-      give: InkStorageSheet.#onGive,
-      editItem: InkStorageSheet.#onEdit,
-      deleteItem: InkStorageSheet.#onDelete,
-      safeRoom: () => toggleSafeRoom()
-    }
-  };
-  static PARTS = { sheet: { template: `${PATH}/storage.hbs`, scrollable: [".ir-body"] } };
-
-  async _prepareContext(options) {
-    const ctx = await super._prepareContext(options);
-    const actor = this.document;
-    ctx.actor = actor;
-    ctx.system = actor.system;
-    ctx.safeRoom = isSafeRoomOpen();
-    ctx.characters = game.actors.filter(a => a.type === "character").map(a => ({ id: a.id, name: a.name }));
-    const groups = { weapon: "Weapons", gear: "Ammo & Gear", armour: "Armour", talent: "Other", attack: "Other" };
-    const sections = {};
-    for (const item of [...actor.items].sort((a, b) => a.name.localeCompare(b.name))) {
-      const label = groups[item.type] ?? "Other";
-      const s = item.system;
-      (sections[label] ??= []).push({
-        item, badge: item.type === "gear" ? `x${s.quantity}` : item.type === "weapon" && s.shots?.max ? `${s.shots.value}/${s.shots.max}` : ""
-      });
-    }
-    ctx.sections = Object.entries(sections).map(([label, rows]) => ({ label, rows }));
-    ctx.count = actor.items.size;
-    return ctx;
-  }
-
-  _item(target) { return this.document.items.get(target.closest("[data-item-id]")?.dataset.itemId); }
-
-  static #onGive(event, target) {
-    const row = target.closest("[data-item-id]");
-    const actor = game.actors.get(row.querySelector("select.give-to")?.value);
-    if (!actor) return ui.notifications.warn("Pick a survivor to give it to.");
-    giveItem(this._item(target), actor);
-  }
-  static #onEdit(event, target) { this._item(target)?.sheet.render(true); }
-  static #onDelete(event, target) { this._item(target)?.deleteDialog?.() ?? this._item(target)?.delete(); }
 }
 
 /* -------------------------------------------- */

@@ -29,7 +29,7 @@ export class InkActor extends Actor {
   prepareDerivedData() {
     super.prepareDerivedData();
     const s = this.system;
-    if (this.type === "storage") return;
+    if (!["character", "monster", "npc"].includes(this.type)) return;   // e.g. module-added actor types
 
     // Characters: Armour = best equipped armour item + bonus.
     if (this.type === "character") {

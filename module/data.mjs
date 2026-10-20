@@ -182,13 +182,6 @@ export class GearData extends foundry.abstract.TypeDataModel {
   }
 }
 
-/** Safe Room Item Box: one shared stash, visible only to the GM. */
-export class StorageData extends foundry.abstract.TypeDataModel {
-  static defineSchema() {
-    return { notes: str() };
-  }
-}
-
 export class TalentData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {

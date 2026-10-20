@@ -229,7 +229,6 @@
               {{#if canUse}}<button type="button" data-action="useItem">Use</button>{{/if}}
               {{#if canReady}}<button type="button" data-action="readyGear" data-tooltip="Ready gives its Defence / Reflexes bonus">{{#if system.ready}}Put away{{else}}Ready{{/if}}</button>{{/if}}
               {{#if isArmour}}<button type="button" data-action="wearArmour">{{#if system.equipped}}Take off{{else}}Wear{{/if}}</button>{{/if}}
-              {{#if @root.boxOpen}}<button type="button" data-action="storeItem" data-tooltip="Put it in the Safe Room Item Box">Store</button>{{/if}}
               {{#if canRotate}}<button type="button" data-action="rotateItem">&#x21bb; Rotate</button>{{/if}}
               <button type="button" data-action="editItem">Edit</button>
               <button type="button" data-action="deleteItem">Discard</button>
@@ -250,14 +249,6 @@
             <span class="tray-name">{{name}}</span><span class="tray-reason">{{#if bonus}}{{bonus}}{{else}}{{reason}}{{/if}}</span>
           </div>
           {{/each}}
-        </div>
-        {{/if}}
-
-        {{#if boxOpen}}
-        <div class="inv-itembox {{#if safeRoom}}open{{/if}}" data-index="0">
-          <div class="box-lid"></div>
-          <div class="box-text"><b>Item Box</b>
-            <small>Drop items here to stash them. Only the GM knows what's inside.</small></div>
         </div>
         {{/if}}
 

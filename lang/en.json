@@ -3,8 +3,7 @@
     "Actor": {
       "character": "Survivor (PC)",
       "monster": "Monster",
-      "npc": "NPC",
-      "storage": "Safe Room Item Box"
+      "npc": "NPC"
     },
     "Item": {
       "weapon": "Weapon",
