@@ -14,9 +14,11 @@
       <div class="form-group"><label>Range</label><select name="system.range">{{selectOptions ranges selected=system.range}}</select></div>
       <div class="form-group"><label>Shots (current / max)</label>
         <input type="number" name="system.shots.value" value="{{system.shots.value}}" min="0">
-        <input type="number" name="system.shots.max" value="{{system.shots.max}}" min="0"></div>
+        <input type="number" name="system.shots.max" value="{{source.shots.max}}" min="0"></div>
+      {{#if (ne system.shots.max source.shots.max)}}<p class="hint">Expanded Mag fitted: {{system.shots.max}} Shots.</p>{{/if}}
       <div class="form-group"><label>Tags</label><input type="text" name="system.tags" value="{{system.tags}}" placeholder="Loud, Up Close"></div>
-      <div class="form-group"><label>Ammo item (Reload uses it)</label><input type="text" name="system.ammo" value="{{system.ammo}}" placeholder="Handgun Ammo"></div>
+      <div class="form-group"><label>Ammo item(s) (Reload uses it)</label><input type="text" name="system.ammo" value="{{system.ammo}}" placeholder="Handgun Ammo"></div>
+      {{#if system.loaded}}<div class="form-group"><label>Loaded round</label><span>{{system.loaded}}{{#if system.loadedDamage}} ({{system.loadedDamage}} dmg{{#if system.loadedTags}}, {{system.loadedTags}}{{/if}}){{/if}}</span></div>{{/if}}
       <div class="form-group"><label>Single use (used up when thrown)</label><input type="checkbox" name="system.singleUse" {{checked system.singleUse}}></div>
       <p class="hint">Automated tags: Brittle, Inferior, Explosive, Spray, Blaze, Full-auto, Up Close, Two-handed, Thrown (Range), Heavy, Loud (reminder).
         Ammo must match the gear item's name exactly.</p>
@@ -29,15 +31,23 @@
 
     {{#if isType.gear}}
       <div class="form-group"><label>Quantity</label><input type="number" name="system.quantity" value="{{system.quantity}}" min="0"></div>
+      <div class="form-group"><label>Stack size (1 = doesn't stack, 0 = no limit)</label><input type="number" name="system.stack" value="{{system.stack}}" min="0" max="99"></div>
       <div class="form-group"><label>+ Inventory Slots (while carried)</label><input type="number" name="system.slotBonus" value="{{system.slotBonus}}" min="0" max="12"></div>
       <div class="form-group"><label>+ Quick Item Slots (while carried)</label><input type="number" name="system.quickBonus" value="{{system.quickBonus}}" min="0" max="4"></div>
+      <div class="form-group"><label>Holster (+1 Quick Slot for one weapon)</label><select name="system.holster">{{selectOptions holsterOptions selected=system.holster}}</select></div>
       <div class="form-group"><label>+ Defence (while ready)</label><input type="number" name="system.defenceBonus" value="{{system.defenceBonus}}" min="-6" max="6"></div>
       <div class="form-group"><label>+ Reflexes dice (while ready)</label><input type="number" name="system.reflexesBonus" value="{{system.reflexesBonus}}" min="0" max="6"></div>
       <div class="form-group"><label>Ready (held)</label><input type="checkbox" name="system.ready" {{checked system.ready}}></div>
+      <div class="form-group"><label>Crafting supply</label><select name="system.supply">{{selectOptions supplyOptions selected=system.supply}}</select></div>
+      <div class="form-group"><label>Crafting tool</label><select name="system.tool">{{selectOptions toolOptions selected=system.tool}}</select></div>
+      <div class="form-group"><label>Gun attachment</label><select name="system.attachment">{{selectOptions attachmentOptions selected=system.attachment}}</select></div>
+      <div class="form-group"><label>Round: damage / Tags (sets the gun's)</label><span class="pair"><input type="number" name="system.round.damage" value="{{system.round.damage}}" min="0"><input type="text" name="system.round.tags" value="{{system.round.tags}}" placeholder="Explosive, Loud"></span></div>
+      <div class="form-group"><label>Half strength (crafted on a failed Test)</label><input type="checkbox" name="system.halfStrength" {{checked system.halfStrength}}></div>
       <div class="form-group"><label>Use effect</label><select name="system.use">{{selectOptions useOptions selected=system.use}}</select></div>
       {{#if (eq system.use "heal")}}
-        <div class="form-group"><label>ECG boxes cleared</label><input type="number" name="system.healEcg" value="{{system.healEcg}}" min="0"></div>
-        <p class="hint">Lesser herb 0, Basic 1, Improved 2, Advanced 3, First-Aid Spray 2.</p>
+        <div class="form-group"><label>ECG boxes cleared (5 = all)</label><input type="number" name="system.healEcg" value="{{system.healEcg}}" min="0" max="5"></div>
+        <div class="form-group"><label>Permanent + Toughness</label><input type="number" name="system.toughnessGain" value="{{system.toughnessGain}}" min="0" max="6"></div>
+        <p class="hint">Healing Herb: Lesser 0, Basic 1, Improved 2, Advanced 3. First-Aid Spray 2. Bolstering Herb 1 (+1 Toughness), Advanced all (+2 Toughness).</p>
       {{/if}}
     {{/if}}
 

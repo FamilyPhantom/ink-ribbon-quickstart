@@ -2,22 +2,19 @@
  * Ink Ribbon (Quick Start) - minimal Foundry VTT v14 system.
  * Entry point: registers data models, document class, sheets, settings, conditions and the Horror tracker.
  */
-import { CONDITIONS } from "./module/config.mjs";
-import { CharacterData, MonsterData, WeaponData, ArmourData, GearData, TalentData, AttackData, StorageData } from "./module/data.mjs";
+import { CONDITIONS, RECIPES, SUPPLIES, TOOLS } from "./module/config.mjs";
+import { CharacterData, MonsterData, WeaponData, ArmourData, GearData, TalentData, AttackData } from "./module/data.mjs";
 import { InkActor, getHorror } from "./module/actor.mjs";
-import { InkCharacterSheet, InkMonsterSheet, InkItemSheet, InkStorageSheet } from "./module/sheets.mjs";
+import { InkCharacterSheet, InkMonsterSheet, InkItemSheet, invDrag } from "./module/sheets.mjs";
 import { HorrorTracker } from "./module/horror.mjs";
 import { importStarter } from "./module/starter.mjs";
-import { registerItemBoxSocket, toggleSafeRoom, getItemBox, itemBoxInstalled } from "./module/itembox.mjs";
 import { buildCompendiums, ensureCompendiums } from "./module/compendium.mjs";
 import { InkCombat, InkCombatant, onConditionGained, onAppear, addCondition, manualTurn } from "./module/rules.mjs";
-
-/** Re-render open Ink Ribbon actor sheets (e.g. when the Safe Room opens or closes). */
-function rerenderSheets() {
-  for (const app of foundry.applications.instances?.values() ?? []) {
-    if ((app instanceof InkCharacterSheet || app instanceof InkStorageSheet) && app.rendered) app.render();
-  }
-}
+import { PACKABLE, shapeOf, resolveInventory, placementUpdate, itemTiles } from "./module/inventory.mjs";
+import { registerSafeRoom, isSafeRoomOpen, toggleSafeRoom, makeItSafe } from "./module/safeRoom.mjs";
+import { findSupplies, bindSupplyButtons } from "./module/supplies.mjs";
+import * as infection from "./module/infection.mjs";
+import { horrorCheck, rollZombieTrait } from "./module/scenario.mjs";
 
 const SYS = "ink-ribbon";
 
@@ -25,8 +22,9 @@ Hooks.once("init", () => {
   console.log("Ink Ribbon | Initialising");
 
   // Data models: the schema for each Actor/Item type (replaces template.json).
-  CONFIG.Actor.dataModels = { character: CharacterData, monster: MonsterData, npc: MonsterData, storage: StorageData };
-  CONFIG.Item.dataModels = { weapon: WeaponData, armour: ArmourData, gear: GearData, talent: TalentData, attack: AttackData };
+  // Assigned key by key so modules can add their own sub-types (e.g. the Item Box module).
+  Object.assign(CONFIG.Actor.dataModels, { character: CharacterData, monster: MonsterData, npc: MonsterData });
+  Object.assign(CONFIG.Item.dataModels, { weapon: WeaponData, armour: ArmourData, gear: GearData, talent: TalentData, attack: AttackData });
   CONFIG.Actor.documentClass = InkActor;
 
   // Conditions replace Foundry's default token status effects.
@@ -43,7 +41,6 @@ Hooks.once("init", () => {
   const { DocumentSheetConfig } = foundry.applications.apps;
   DocumentSheetConfig.registerSheet(Actor, SYS, InkCharacterSheet, { types: ["character"], makeDefault: true, label: "Ink Ribbon Survivor" });
   DocumentSheetConfig.registerSheet(Actor, SYS, InkMonsterSheet, { types: ["monster", "npc"], makeDefault: true, label: "Ink Ribbon Monster / NPC" });
-  DocumentSheetConfig.registerSheet(Actor, SYS, InkStorageSheet, { types: ["storage"], makeDefault: true, label: "Ink Ribbon Item Box" });
   DocumentSheetConfig.registerSheet(Item, SYS, InkItemSheet, { makeDefault: true, label: "Ink Ribbon Item" });
 
   // Horror (1-5) is shared world state, editable by the GM.
@@ -53,20 +50,19 @@ Hooks.once("init", () => {
     range: { min: 1, max: 5, step: 1 },
     onChange: () => HorrorTracker.instance?.render()
   });
-
-  // Safe Room: while open, players can stash items in the shared Item Box.
-  game.settings.register(SYS, "safeRoom", {
-    name: "Safe Room open", scope: "world", config: false, type: Boolean, default: false,
-    onChange: () => { HorrorTracker.instance?.render(); rerenderSheets(); }
+  // IR-Virus infection (Dead on Arrival p.50). The booklet allows ignoring it in the Quick Start.
+  game.settings.register(SYS, "infection", {
+    name: "Infection rules", hint: "Use the IR-Virus infection rules (Dead on Arrival p.50): bite Test, hourly spread, stages. The booklet says you can ignore them.",
+    scope: "world", config: true, type: Boolean, default: true
   });
+  // Safe Room (rules p.34): the GM opens it from the Horror bar; rest, health packs and crafting read it.
+  registerSafeRoom();
 });
 
 Hooks.once("ready", () => {
   HorrorTracker.instance = new HorrorTracker();
   HorrorTracker.instance.render({ force: true });
-  registerItemBoxSocket();
   ensureCompendiums();
-  if (game.user.isGM) itemBoxInstalled();      // warns if Foundry needs a full restart after a manifest change
 });
 
 /** Default icons for new items so the sheets don't look empty. */
@@ -90,6 +86,7 @@ Hooks.on("preCreateActor", (actor, data) => {
 
 /** Chat card buttons: damage and conditions, applied to the selected tokens. */
 Hooks.on("renderChatMessageHTML", (message, html) => {
+  bindSupplyButtons(message, html);                       // Finding Supplies: Give buttons
   const selected = () => {
     const tokens = canvas.tokens.controlled;
     if (!tokens.length) ui.notifications.warn("Select the token(s) first.");
@@ -121,14 +118,27 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
 /** Condition side effects (Frightened: +1 Stress & Adrenaline; Dying -> Unconscious -> Prone + Incapacitated). */
 Hooks.on("createActiveEffect", (effect, options, userId) => {
   if (userId !== game.user.id || !(effect.parent instanceof Actor)) return;
-  for (const id of effect.statuses ?? []) onConditionGained(effect.parent, id);
+  for (const id of effect.statuses ?? []) {
+    onConditionGained(effect.parent, id);
+    if (id === "dead") infection.onDeath(effect.parent);   // infected survivors come back
+  }
 });
 
 /** Horror +1 when a monster with "Horror on appear" shows up (placed visible, or revealed). */
 Hooks.on("createToken", (tokenDoc, options, userId) => { if (userId === game.user.id && !tokenDoc.hidden) onAppear(tokenDoc); });
 Hooks.on("updateToken", (tokenDoc, changes, options, userId) => { if (userId === game.user.id && changes.hidden === false) onAppear(tokenDoc); });
 
-// Handy for macros: game.inkRibbon.horror()
+// Handy for macros (game.inkRibbon.horror()) and for add-on modules (game.inkRibbon.inventory).
+// Add-on hooks: "inkRibbon.renderHorrorBar" (element) after the Horror bar draws;
+// survivor sheets fire Foundry's usual "renderInkCharacterSheet" (app, element, context).
 Hooks.once("setup", () => {
-  game.inkRibbon = { horror: getHorror, importStarter, buildCompendiums, toggleSafeRoom, itemBox: getItemBox, startTurn: manualTurn };
+  game.inkRibbon = {
+    horror: getHorror, importStarter, buildCompendiums, startTurn: manualTurn,
+    renderHorrorBar: () => HorrorTracker.instance?.render(),
+    crafting: { RECIPES, SUPPLIES, TOOLS },
+    safeRoom: { isOpen: isSafeRoomOpen, toggle: toggleSafeRoom, makeItSafe },
+    infection, horrorCheck, rollZombieTrait,
+    findSupplies,  // hook: "inkRibbon.safeRoom" (open)               // actor.promptCraft() / actor.craft(recipeId, { safeRoom })
+    inventory: { drag: invDrag, PACKABLE, shapeOf, resolveInventory, placementUpdate, itemTiles }
+  };
 });

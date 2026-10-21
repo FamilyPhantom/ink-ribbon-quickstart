@@ -307,22 +307,6 @@
 .ink-ribbon .inv-worn .hint { text-align: center; padding: 0 6px; }
 .ink-ribbon .inv-count small { font-size: 9px; text-transform: uppercase; color: #8a847a; }
 
-/* Safe Room Item Box drop zone */
-.ink-ribbon .inv-itembox {
-  display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: copy;
-  border: 2px dashed #8a7a5c; background: #efe7d6; color: var(--ir-muted); transition: background .2s, border-color .2s;
-}
-.ink-ribbon .inv-itembox.open { border-style: solid; border-color: #6b5530; background: linear-gradient(#f3ead6, #e3d5b6); color: var(--ir-ink); }
-.ink-ribbon .inv-itembox.drop-hover { border-color: var(--ir-green); background: #dfeccf; }
-.ink-ribbon .box-lid {
-  flex: 0 0 auto; width: 44px; height: 32px; border-radius: 4px 4px 2px 2px; position: relative;
-  background: linear-gradient(#7a5a32 0 40%, #5b4224 40% 46%, #7a5a32 46%); border: 2px solid #3b2a16;
-}
-.ink-ribbon .box-lid::after { content: ""; position: absolute; left: 50%; top: 9px; width: 8px; height: 9px; transform: translateX(-50%); background: #d4b11c; border: 1px solid #3b2a16; }
-.ink-ribbon .inv-itembox.drop-hover .box-lid { background: linear-gradient(#7a5a32 0 22%, #2b1f12 22% 46%, #7a5a32 46%); }
-.ink-ribbon .box-text b { display: block; font-family: var(--ir-head); text-transform: uppercase; letter-spacing: 1px; font-size: 14px; }
-.ink-ribbon .box-text small { font-size: 11px; }
-
 /* Examine panel + tray */
 .ink-ribbon .inv-side { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .ink-ribbon .inv-examine { background: #faf7f0; border: 1px solid var(--ir-line); padding: 0 8px 8px; min-height: 230px; }
@@ -349,17 +333,6 @@
 .ink-ribbon .tray-name { flex: 1; }
 .ink-ribbon .tray-reason { font-size: 10px; color: var(--ir-muted); font-style: italic; }
 .ink-ribbon .tray-row.over .tray-reason { color: var(--ir-red); font-weight: bold; font-style: normal; }
-
-/* Item Box sheet (GM) */
-.ink-ribbon .ir-saferoom { width: auto; padding: 0 10px; height: 34px; border-color: #555 !important; }
-.ink-ribbon .ir-saferoom.open { background: #2f5e22 !important; box-shadow: 0 0 10px rgba(80, 180, 60, .5); }
-.ink-ribbon h4.box-section { font-family: var(--ir-head); text-transform: uppercase; font-size: 12px; letter-spacing: 1px; color: var(--ir-muted); margin: 8px 0 2px; border-bottom: 1px solid var(--ir-line); }
-.ink-ribbon .box-img { width: 36px; }
-.ink-ribbon .box-img img { width: 30px; height: 30px; background: #26231f; border: 1px solid #000; padding: 2px; }
-.ink-ribbon .box-badge { font-family: var(--ir-head); color: #2f5e22; margin-left: 4px; }
-.ink-ribbon .box-give { white-space: nowrap; text-align: right; width: 210px; }
-.ink-ribbon .box-give select { height: 22px; font-size: 11px; max-width: 140px; }
-.ink-ribbon tr.draggable { cursor: grab; }
 
 /* Conditions bar (under the tabs) */
 .ink-ribbon .ir-conditions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 4px 10px; background: #e9e4da; border-bottom: 1px solid var(--ir-line); min-height: 30px; }
@@ -431,6 +404,7 @@
 #ir-horror {
   position: fixed; top: 6px; left: 50%; transform: translateX(-50%); z-index: 70;
   display: flex; gap: 6px; align-items: center; padding: 4px 10px;
+  width: max-content; max-width: calc(100vw - 16px); white-space: nowrap;
   background: rgba(15, 12, 11, .88); border: 1px solid #5a1410; border-radius: 3px;
   font-family: "Oswald", sans-serif; color: #ddd; text-transform: uppercase; letter-spacing: 1px; font-size: 12px;
 }
@@ -440,7 +414,44 @@
 #ir-horror a { color: #bbb; cursor: pointer; padding: 0 3px; }
 #ir-horror a:hover { color: #ff5446; }
 #ir-horror .hsep { width: 1px; height: 14px; background: #555; }
+/* Bigger Horror -/+ buttons, easier to hit */
+#ir-horror a[data-ir="down"], #ir-horror a[data-ir="up"] {
+  font-size: 22px; line-height: 1; font-weight: 700; padding: 2px 9px; border: 1px solid #5a1410; border-radius: 3px; background: rgba(90, 20, 16, .25);
+}
+#ir-horror a[data-ir="down"]:hover, #ir-horror a[data-ir="up"]:hover { background: rgba(195, 36, 27, .35); }
+
+/* Crafting dialog */
+.ir-craft table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 6px; }
+.ir-craft th { text-align: left; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid currentColor; }
+.ir-craft td { padding: 3px 4px; border-bottom: 1px solid rgba(128, 128, 128, .3); vertical-align: middle; }
+.ir-craft td label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+.ir-craft td.amt { text-align: center; }
+.ir-craft tr.cant { opacity: .55; }
+.ir-craft tr.cant label { cursor: default; }
+.ir-craft .have { color: #4f9a3a; }
+.ir-craft .lack { color: #c0392b; }
+.ir-craft .opt { opacity: .75; font-style: italic; }
+.ir-craft small { opacity: .75; }
+.ink-ribbon .inv-add button.craft { background: var(--ir-dark); color: #fff; }
+
+/* Safe Room (Horror bar) */
 #ir-horror a.on { color: #7fe06a; text-shadow: 0 0 6px #3f7a2b; }
 #ir-horror.safe { border-color: #3f7a2b; box-shadow: 0 0 12px rgba(63, 122, 43, .45); }
 #ir-horror .hsafe { color: #7fe06a; text-shadow: 0 0 6px #3f7a2b; animation: ir-safe 3s ease-in-out infinite; }
 @keyframes ir-safe { 50% { opacity: .55; } }
+
+/* Gun attachments in Examine */
+.ink-ribbon .exam-mods { font-size: 11px; margin-top: 3px; }
+.ink-ribbon .exam-mods span { display: inline-block; border: 1px solid var(--ir-line); background: #fff; padding: 0 4px; margin: 1px 2px 1px 0; }
+.ink-ribbon .exam-mods a { color: var(--ir-muted); margin-left: 2px; }
+.ink-ribbon .exam-mods a:hover { color: var(--ir-red); }
+
+/* Finding Supplies card */
+.ir-card.ir-supplies ul { list-style: none; margin: 4px 0; padding: 0; }
+.ir-card.ir-supplies li { border-bottom: 1px dashed #b9b2a5; padding: 3px 0; }
+.ir-card.ir-supplies li .ir-buttons { margin-top: 2px; }
+
+/* Holster Quick Slots */
+.ink-ribbon .quick-cell.holster { border-style: dashed; }
+.ink-ribbon .quick-cell .quick-kind { display: flex; align-items: center; justify-content: center; height: 100%; text-align: center;
+  font-size: 10px; line-height: 1.1; text-transform: uppercase; letter-spacing: 1px; color: #777; pointer-events: none; }

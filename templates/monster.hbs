@@ -38,6 +38,8 @@
     </div>
     <p class="hint">Health max 0 = no Health (Horde: dies at 0 Toughness). Boss/Nemesis die when both are 0.</p>
 
+    {{#if (and isGM isZombie)}}<div class="ir-buttons ir-specials"><button type="button" data-action="zombieTrait" data-tooltip="Roll a d66 Zombie Trait (Dead on Arrival p.55) and add it to the Abilities">Roll Zombie Trait</button></div>{{/if}}
+
     {{#if traitSummary.length}}<div class="ir-traitline">{{#each traitSummary}}<span>{{this}}</span>{{/each}}</div>{{/if}}
     {{#if (or hasFear system.weak.max)}}
     <div class="ir-buttons ir-specials">

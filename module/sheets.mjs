@@ -1,11 +1,19 @@
-import { ATTRIBUTES, SKILLS, CONDITIONS } from "./config.mjs";
+import { ATTRIBUTES, SKILLS, CONDITIONS, SUPPLIES, TOOLS, ATTACHMENTS, HOLSTERS } from "./config.mjs";
 import { removeCondition, manualTurn, grotesque, roar } from "./rules.mjs";
 import { ecgContext } from "./ecg.mjs";
-import { PACKABLE, COLS, shapeOf, resolveInventory, placementUpdate, inventoryContext } from "./inventory.mjs";
-import { storeItem, giveItem, isSafeRoomOpen, toggleSafeRoom } from "./itembox.mjs";
+import * as infection from "./infection.mjs";
+import { rollZombieTrait } from "./scenario.mjs";
+import { PACKABLE, COLS, shapeOf, sizeOf, quickFits, resolveInventory, placementUpdate, inventoryContext } from "./inventory.mjs";
 
 /** The item currently being dragged out of an inventory grid (shared by all open sheets). */
-const invDrag = { current: null };
+/**
+ * The item being dragged onto an inventory grid (shared by all open sheets).
+ * Add-on modules can start their own drags by setting `current` to
+ *   { foreign: true, item, onDrop: (sheet, placement) => ... }
+ * The grid then highlights the item's footprint and, on drop, hands over a checked placement:
+ *   { zone: "grid", x, y, rot } | { zone: "quick", index } | { zone: "worn" }
+ */
+export const invDrag = { current: null };
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2, ItemSheetV2 } = foundry.applications.sheets;
@@ -40,7 +48,15 @@ class InkActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       deathDie: InkActorSheet.#onDeathDie,
       endCondition: InkActorSheet.#onEndCondition,
       escape: InkActorSheet.#onEscape,
-      startTurn: InkActorSheet.#onStartTurn
+      startTurn: InkActorSheet.#onStartTurn,
+      infBitten: InkActorSheet.#onInfBitten,
+      infHour: InkActorSheet.#onInfHour,
+      infTen: InkActorSheet.#onInfTen,
+      infUp: InkActorSheet.#onInfUp,
+      infDown: InkActorSheet.#onInfDown,
+      infCure: InkActorSheet.#onInfCure,
+      heroic: InkActorSheet.#onHeroic,
+      endHeroic: InkActorSheet.#onEndHeroic
     }
   };
 
@@ -54,6 +70,8 @@ class InkActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     ctx.system = s;
     ctx.tab = this.tab;
     ctx.isGM = game.user.isGM;
+    ctx.infectionOn = infection.infectionOn();
+    ctx.heroic = !!actor.getFlag("ink-ribbon", "heroic");
     ctx.attributes = Object.entries(ATTRIBUTES).map(([key, label]) => ({ key, label, value: s.attributes[key] }));
     ctx.skills = Object.entries(SKILLS).map(([key, [label, attr]]) => {
       const training = s.skills[key].training;
@@ -63,7 +81,11 @@ class InkActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       };
     });
     const byType = t => actor.items.filter(i => i.type === t).sort((a, b) => a.sort - b.sort);
-    ctx.weapons = byType("weapon").map(i => ({ item: i, pool: this.#weaponPool(i) }));
+    ctx.weapons = byType("weapon").map(i => {
+      const prof = actor.weaponProfile?.(i);
+      return { item: i, pool: this.#weaponPool(i), damage: prof?.damage ?? i.system.damage, tags: prof?.tags ?? i.system.tags,
+        range: i.system.rangeEff ?? i.system.range, mods: (i.system.mods ?? []).map(m => m.name).join(", ") };
+    });
     ctx.armour = byType("armour");
     ctx.gear = byType("gear");
     ctx.talents = byType("talent");
@@ -132,6 +154,14 @@ class InkActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
   static #onPanic() { this.document.rollPanic(); }
   static #onStartTurn() { if (game.user.isGM) manualTurn(this.document); }
+  static #onInfBitten() { infection.bitten(this.document); }
+  static #onInfHour() { infection.hourPasses(this.document); }
+  static #onInfTen() { infection.tenMinutes(this.document); }
+  static #onInfUp() { infection.setStage(this.document, (this.document.system.infection?.stage ?? 0) + 1); }
+  static #onInfDown() { infection.setStage(this.document, (this.document.system.infection?.stage ?? 0) - 1); }
+  static #onInfCure() { infection.setStage(this.document, 0, { cure: true }); }
+  static #onHeroic() { infection.heroicSacrifice(this.document); }
+  static #onEndHeroic() { infection.endSacrifice(this.document); }
 
   /** Stand up (Prone), douse the flames (Burning), or the GM clearing any condition. */
   static #onEndCondition(event, target) {
@@ -168,6 +198,12 @@ class InkActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 }
 
+/** Why an item can't go in a holster's Quick Slot. */
+function holsterWarning(item, type) {
+  const h = HOLSTERS[type];
+  return `That Quick Slot is a ${h.label}: it holds ${h.needs}${item.type === "weapon" ? ` (${item.name} is Size ${sizeOf(item)})` : ""}.`;
+}
+
 /** "Name: text" lines -> paragraphs with the name in bold. Everything is HTML-escaped first. */
 function formatAbilities(text = "") {
   const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -189,7 +225,10 @@ export class InkCharacterSheet extends InkActorSheet {
       rotateItem: InkCharacterSheet.#onRotateItem,
       wearArmour: InkCharacterSheet.#onWearArmour,
       readyGear: InkCharacterSheet.#onReadyGear,
-      storeItem: InkCharacterSheet.#onStoreItem
+      craft: InkCharacterSheet.#onCraft,
+      splitStack: InkCharacterSheet.#onSplitStack,
+      fitAttachment: InkCharacterSheet.#onFitAttachment,
+      removeAttachment: InkCharacterSheet.#onRemoveAttachment
     }
   };
   static PARTS = { sheet: { template: `${PATH}/character.hbs`, scrollable: [".ir-body"] } };
@@ -204,10 +243,8 @@ export class InkCharacterSheet extends InkActorSheet {
     ctx.ecg = ecgContext(this.document);
     ctx.healthState = ctx.ecg.state;
     ctx.adrenalinePips = Array.from({ length: s.adrenaline.max }, (_, i) => ({ n: i + 1, filled: i < s.adrenaline.value }));
-    ctx.useOptions = { none: "No auto effect", heal: "Heal (herb / spray)", healthpack: "Health Pack", adrenaline: "Adrenaline Shot" };
+    ctx.useOptions = { none: "No auto effect", heal: "Heal (herb / spray)", healthpack: "Health Pack", adrenaline: "Adrenaline Shot", sedative: "Sedative" };
     if (this.tab === "inventory") ctx.inv = inventoryContext(this.document, this.selectedItemId);
-    ctx.boxOpen = isSafeRoomOpen();             // Item Box + Store only appear in a Safe Room (GM uses the Box button otherwise)
-    ctx.safeRoom = isSafeRoomOpen();
     return ctx;
   }
 
@@ -258,9 +295,26 @@ export class InkCharacterSheet extends InkActorSheet {
     if (item?.type === "gear") item.update({ "system.ready": !item.system.ready });
   }
 
-  static #onStoreItem(event, target) {
+  /** Crafting dialog. From a supply or tool in Examine, it shows the recipes that use it. */
+  static #onCraft(event, target) {
     const item = this.document.items.get(target.closest("[data-item-id]")?.dataset.itemId);
-    if (item) { this.selectedItemId = null; storeItem(item); }
+    this.document.promptCraft({ item });
+  }
+
+  /** Over its Stack size: split into separate items. */
+  static #onSplitStack(event, target) {
+    const item = this.document.items.get(target.closest("[data-item-id]")?.dataset.itemId);
+    if (item) this.document.splitStack(item);
+  }
+
+  /** Gun attachments: fit to a gun / take off. */
+  static #onFitAttachment(event, target) {
+    const item = this.document.items.get(target.closest("[data-item-id]")?.dataset.itemId);
+    if (item) this.document.promptFit(item);
+  }
+  static #onRemoveAttachment(event, target) {
+    const item = this.document.items.get(target.closest("[data-item-id]")?.dataset.itemId);
+    if (item) this.document.removeAttachment(item);
   }
 
   /* ---------------- Inventory: drag & drop ---------------- */
@@ -271,7 +325,7 @@ export class InkCharacterSheet extends InkActorSheet {
     const grid = root.querySelector(".inv-grid");
 
     // Drag sources: every item tile.
-    for (const tile of root.querySelectorAll(".inv-tile")) {
+    for (const tile of root.querySelectorAll(".inv-tile[data-item-id]")) {
       tile.addEventListener("dragstart", ev => {
         const item = this.document.items.get(tile.dataset.itemId);
         if (!item) return;
@@ -313,9 +367,9 @@ export class InkCharacterSheet extends InkActorSheet {
       });
     }
 
-    // Drop targets: Quick Item Slots, the Worn armour slot and the Safe Room Item Box.
-    for (const el of root.querySelectorAll(".quick-cell, .inv-worn, .inv-itembox")) {
-      const zone = el.classList.contains("inv-itembox") ? "box" : el.classList.contains("inv-worn") ? "worn" : "quick";
+    // Drop targets: Quick Item Slots and the Worn armour slot.
+    for (const el of root.querySelectorAll(".quick-cell, .inv-worn")) {
+      const zone = el.classList.contains("inv-worn") ? "worn" : "quick";
       el.addEventListener("dragover", ev => { ev.preventDefault(); ev.stopPropagation(); el.classList.add("drop-hover"); });
       el.addEventListener("dragleave", () => el.classList.remove("drop-hover"));
       el.addEventListener("drop", ev => {
@@ -331,8 +385,8 @@ export class InkCharacterSheet extends InkActorSheet {
     const rect = grid.getBoundingClientRect();
     const cx = Math.floor((ev.clientX - rect.left) / (rect.width / COLS));
     const cy = Math.floor((ev.clientY - rect.top) / (rect.height / 3));
-    const drag = invDrag.current?.actorUuid === this.document.uuid ? invDrag.current : null;
-    const item = drag && this.document.items.get(drag.id);
+    const drag = invDrag.current?.foreign || invDrag.current?.actorUuid === this.document.uuid ? invDrag.current : null;
+    const item = drag?.foreign ? drag.item : drag && this.document.items.get(drag.id);
     const x = cx - (drag?.dx ?? 0), y = cy - (drag?.dy ?? 0);
     if (!item) return { x, y, shape: { w: 1, h: 1 }, ok: true };
     const r = resolveInventory(this.document);
@@ -350,6 +404,9 @@ export class InkCharacterSheet extends InkActorSheet {
     }
   }
 
+  /** Public so add-on modules can clear the drop highlight when their drag ends. */
+  clearDropHighlight() { this.#clearHighlight(); }
+
   #clearHighlight() {
     for (const el of this.element.querySelectorAll(".drop-ok, .drop-bad, .drop-hover")) el.classList.remove("drop-ok", "drop-bad", "drop-hover");
   }
@@ -357,13 +414,14 @@ export class InkCharacterSheet extends InkActorSheet {
   async #onInvDrop(ev, zone, target) {
     const drag = invDrag.current;
     invDrag.current = null;
-    let item = drag?.actorUuid === this.document.uuid ? this.document.items.get(drag.id) : null;
 
-    // Item Box: only this survivor's own items can be stashed from here.
-    if (zone === "box") {
-      if (item) { this.selectedItemId = null; return storeItem(item); }
-      return ui.notifications.warn("Drag one of this survivor's items into the Item Box.");
+    // A drag started by an add-on module: check the spot, then let the module do the move.
+    if (drag?.foreign) {
+      const placement = this.#placementFor(drag.item, zone, target);
+      if (placement) return drag.onDrop?.(this, placement);
+      return;
     }
+    let item = drag?.actorUuid === this.document.uuid ? this.document.items.get(drag.id) : null;
 
     // Dropped from the sidebar, a compendium or another actor: copy it onto this actor first.
     if (!item) {
@@ -373,12 +431,6 @@ export class InkCharacterSheet extends InkActorSheet {
       if (!source) return;
       if (!PACKABLE.includes(source.type)) return ui.notifications.warn("Only weapons, armour and gear go in the inventory.");
       if (source.parent === this.document) item = source;
-      else if (source.parent?.type === "storage") {
-        // GM dragging out of the Item Box: a move, not a copy.
-        if (!game.user.isGM) return;
-        await giveItem(source, this.document);
-        return;
-      }
       else {
         const obj = source.toObject();
         delete obj._id;
@@ -390,6 +442,30 @@ export class InkCharacterSheet extends InkActorSheet {
       }
     }
     return this._moveItem(item, zone, target);
+  }
+
+  /** Where an item not yet on this survivor would land (null + warning if it can't go there). */
+  #placementFor(item, zone, target) {
+    const r = resolveInventory(this.document);
+    if (zone === "grid") {
+      const rot = item.system.inv?.rot ?? false;
+      for (const rr of sizeOf(item) > 1 ? [rot, !rot] : [rot]) {
+        if (r.grid.fits(target.x, target.y, shapeOf(item, rr))) return { zone: "grid", x: target.x, y: target.y, rot: rr };
+      }
+      ui.notifications.warn(`${item.name} doesn't fit there.`);
+      return null;
+    }
+    if (zone === "quick") {
+      if (target.index >= r.qmax || r.quick[target.index]) { ui.notifications.warn("That Quick Item Slot isn't free."); return null; }
+      if (!quickFits(item, r.types[target.index])) { ui.notifications.warn(holsterWarning(item, r.types[target.index])); return null; }
+      if (item.type === "weapon" && item.system.hasTag?.("Heavy")) { ui.notifications.warn(`${item.name} is Heavy: it can't go in a Quick Item Slot.`); return null; }
+      return { zone: "quick", index: target.index };
+    }
+    if (zone === "worn") {
+      if (item.type !== "armour") { ui.notifications.warn("Only armour can be worn."); return null; }
+      return { zone: "worn" };
+    }
+    return null;
   }
 
   /**
@@ -411,7 +487,7 @@ export class InkCharacterSheet extends InkActorSheet {
       rot ??= prev?.zone === "grid" ? prev.rot : item.system.inv.rot;
       if (!r.grid.fits(x, y, shapeOf(item, rot))) {
         // Helpful fallback: a 2-wide item dropped where only 2-tall fits gets rotated for you.
-        if (!strict && item.system.size > 1 && r.grid.fits(x, y, shapeOf(item, !rot))) rot = !rot;
+        if (!strict && sizeOf(item) > 1 && r.grid.fits(x, y, shapeOf(item, !rot))) rot = !rot;
         else return ui.notifications.warn(`${item.name} doesn't fit there.`);
       }
       set(item.id, { ...placementUpdate({ zone: "grid", x, y, rot }), ...unwear });
@@ -419,14 +495,15 @@ export class InkCharacterSheet extends InkActorSheet {
 
     else if (zone === "quick") {
       if (index >= r.qmax) return ui.notifications.warn("That Quick Item Slot is locked (raise Quick Slots).");
-      if (item.system.size <= 0) return ui.notifications.info(`${item.name} doesn't need a slot.`);
+      if (!quickFits(item, r.types[index])) return ui.notifications.warn(holsterWarning(item, r.types[index]));
+      if (sizeOf(item) <= 0) return ui.notifications.info(`${item.name} doesn't need a slot.`);
       if (item.type === "weapon" && item.system.hasTag("Heavy")) return ui.notifications.warn(`${item.name} is Heavy: it can't go in a Quick Item Slot.`);
       const occupant = r.quick[index];
       if (occupant && occupant !== item.id) {
         // Swap: the occupant takes the dragged item's old quick slot, or the first free grid spot.
-        if (prev?.zone === "quick") set(occupant, placementUpdate({ zone: "quick", index: prev.index }));
+        const occ = actor.items.get(occupant);
+        if (prev?.zone === "quick" && quickFits(occ, r.types[prev.index])) set(occupant, placementUpdate({ zone: "quick", index: prev.index }));
         else {
-          const occ = actor.items.get(occupant);
           const spot = r.grid.firstFitItem(occ);
           if (!spot) return ui.notifications.warn(`No room in the inventory to swap out ${occ.name}.`);
           set(occupant, placementUpdate({ zone: "grid", ...spot }));
@@ -457,7 +534,8 @@ export class InkMonsterSheet extends InkActorSheet {
       fearFirst: InkMonsterSheet.#onFearFirst,
       fearLater: InkMonsterSheet.#onFearLater,
       roar: InkMonsterSheet.#onRoar,
-      toggleAbilities: InkMonsterSheet.#onToggleAbilities
+      toggleAbilities: InkMonsterSheet.#onToggleAbilities,
+      zombieTrait: InkMonsterSheet.#onZombieTrait
     }
   };
 
@@ -467,6 +545,7 @@ export class InkMonsterSheet extends InkActorSheet {
   static #onFearFirst() { if (game.user.isGM) grotesque(this.document, true); }
   static #onFearLater() { if (game.user.isGM) grotesque(this.document, false); }
   static #onRoar() { if (game.user.isGM) roar(this.document); }
+  static #onZombieTrait() { rollZombieTrait(this.document); }
   static PARTS = { sheet: { template: `${PATH}/monster.hbs`, scrollable: [".ir-body"] } };
 
   async _prepareContext(options) {
@@ -475,6 +554,7 @@ export class InkMonsterSheet extends InkActorSheet {
     ctx.trainedSkills = ctx.skills.filter(sk => sk.training > 0);
     const t = this.document.system.traits;
     ctx.hasFear = t.grotesque || t.roar;
+    ctx.isZombie = /zombie/i.test(this.document.name) || /zombie/i.test(this.document.system.tags);
     ctx.traitSummary = [
       t.vsRanged && `+${t.vsRanged} Defence vs ranged`, t.vsMelee && `+${t.vsMelee} Defence vs melee`,
       t.aimForHead && "Aim For the Head", t.backFromDead && `Back From the Dead${t.bftdUsed ? " (used)" : ""}`,
@@ -490,58 +570,6 @@ export class InkMonsterSheet extends InkActorSheet {
     ctx.conditionOptions = Object.fromEntries([["", "None"], ...CONDITIONS.map(c => [c.id, c.name])]);
     return ctx;
   }
-}
-
-/* -------------------------------------------- */
-/*  Safe Room Item Box (GM only)                */
-/* -------------------------------------------- */
-
-export class InkStorageSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
-  static DEFAULT_OPTIONS = {
-    classes: ["ink-ribbon", "sheet", "actor", "storage"],
-    position: { width: 560, height: 640 },
-    window: { resizable: true },
-    form: { submitOnChange: true },
-    actions: {
-      give: InkStorageSheet.#onGive,
-      editItem: InkStorageSheet.#onEdit,
-      deleteItem: InkStorageSheet.#onDelete,
-      safeRoom: () => toggleSafeRoom()
-    }
-  };
-  static PARTS = { sheet: { template: `${PATH}/storage.hbs`, scrollable: [".ir-body"] } };
-
-  async _prepareContext(options) {
-    const ctx = await super._prepareContext(options);
-    const actor = this.document;
-    ctx.actor = actor;
-    ctx.system = actor.system;
-    ctx.safeRoom = isSafeRoomOpen();
-    ctx.characters = game.actors.filter(a => a.type === "character").map(a => ({ id: a.id, name: a.name }));
-    const groups = { weapon: "Weapons", gear: "Ammo & Gear", armour: "Armour", talent: "Other", attack: "Other" };
-    const sections = {};
-    for (const item of [...actor.items].sort((a, b) => a.name.localeCompare(b.name))) {
-      const label = groups[item.type] ?? "Other";
-      const s = item.system;
-      (sections[label] ??= []).push({
-        item, badge: item.type === "gear" ? `x${s.quantity}` : item.type === "weapon" && s.shots?.max ? `${s.shots.value}/${s.shots.max}` : ""
-      });
-    }
-    ctx.sections = Object.entries(sections).map(([label, rows]) => ({ label, rows }));
-    ctx.count = actor.items.size;
-    return ctx;
-  }
-
-  _item(target) { return this.document.items.get(target.closest("[data-item-id]")?.dataset.itemId); }
-
-  static #onGive(event, target) {
-    const row = target.closest("[data-item-id]");
-    const actor = game.actors.get(row.querySelector("select.give-to")?.value);
-    if (!actor) return ui.notifications.warn("Pick a survivor to give it to.");
-    giveItem(this._item(target), actor);
-  }
-  static #onEdit(event, target) { this._item(target)?.sheet.render(true); }
-  static #onDelete(event, target) { this._item(target)?.deleteDialog?.() ?? this._item(target)?.delete(); }
 }
 
 /* -------------------------------------------- */
@@ -566,7 +594,12 @@ export class InkItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     ctx.categories = { melee: "Melee (Str + Fighting)", ranged: "Ranged gun (Agi + Shooting)", thrown: "Thrown (Str + Shooting)" };
     ctx.kinds = { melee: "Melee", ranged: "Ranged" };
     ctx.ranges = { Adjacent: "Adjacent", Short: "Short", Medium: "Medium", Long: "Long", Extreme: "Extreme" };
-    ctx.useOptions = { none: "No automatic effect", heal: "Heal: restore Toughness + clear ECG boxes", healthpack: "Health Pack (Medicine Test)", adrenaline: "Adrenaline Shot" };
+    ctx.useOptions = { none: "No automatic effect", heal: "Heal: restore Toughness + clear ECG boxes", healthpack: "Health Pack (Medicine Test)", adrenaline: "Adrenaline Shot", sedative: "Sedative: Stress -1d3", light: "Light: Losing Light check (not used up)" };
+    ctx.supplyOptions = { "": "Not a crafting supply", ...SUPPLIES };
+    ctx.holsterOptions = { "": "Not a holster", ...Object.fromEntries(Object.entries(HOLSTERS).map(([k, v]) => [k, v.label])) };
+    ctx.attachmentOptions = { "": "Not a gun attachment", ...Object.fromEntries(Object.entries(ATTACHMENTS).map(([k, v]) => [k, v.label])) };
+    ctx.source = this.document._source.system;            // raw values (Expanded Mag changes the live Shots max)
+    ctx.toolOptions = { "": "Not a crafting tool", ...TOOLS };
     return ctx;
   }
 }
