@@ -45,6 +45,7 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
       armour: new fields.SchemaField({ bonus: int(0, -20) }),
       ecg: new fields.SchemaField({ value: int(0, 0, 5) }),   // filled boxes on the ECG Health Tracker
       bankedDie: bool(),
+      infection: new fields.SchemaField({ infected: bool(), stage: int(0, 0, 4) }),   // IR-Virus (GM only, see infection.mjs)
       slots: new fields.SchemaField({ max: int(4, 0, 12) }),
       quickSlots: new fields.SchemaField({ max: int(2, 0, 4) }),  // Quick Item Slots (base 2, up to 4)
       notes: str()
@@ -60,10 +61,12 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
 
     this.ecg.max = 5;
     this.ecg.state = healthState(this.ecg.value);
-    this.injured = this.ecg.value >= 5;                     // Danger => Injured condition
+    const infectedInjured = this.infection.infected && this.infection.stage >= 3;   // IR-Virus Stage 3: Injured, can't be removed
+    this.injured = this.ecg.value >= 5 || infectedInjured;  // Danger => Injured condition
 
     // Caution: -1 Defence. Danger keeps Caution's -1 and adds Injured's -1.
-    const healthPenalty = this.ecg.value >= 5 ? -2 : this.ecg.value >= 3 ? -1 : 0;
+    let healthPenalty = this.ecg.value >= 5 ? -2 : this.ecg.value >= 3 ? -1 : 0;
+    if (infectedInjured && this.ecg.value < 5) healthPenalty -= 1;   // Injured's -1 Defence
     this.defence.base = defenceFromTable(a.agility + this.skills.reflexes.training);
     this.defence.value = this.defence.base + this.defence.bonus + healthPenalty;
 
@@ -148,7 +151,10 @@ export class WeaponData extends foundry.abstract.TypeDataModel {
       damage: int(2),
       range: str("Adjacent"),
       shots: new fields.SchemaField({ value: int(0), max: int(0) }),
-      ammo: str(),                                         // name of the gear item Reload takes Shots from ("" = free reload)
+      ammo: str(),                                         // gear item(s) Reload takes Shots from, comma list ("" = free reload)
+      loaded: str(),                                       // round currently loaded (e.g. "Flame Rounds" in a Grenade Launcher)
+      loadedDamage: int(0),                                // that round's damage (0 = use the weapon's)
+      loadedTags: str(),                                   // that round's Tags (added to the weapon's)
       singleUse: bool(),                                   // thrown weapons: used up when thrown
       tags: str()                                          // comma list: Loud, Up Close, Brittle, Inferior, Explosive, Blaze...
     };
@@ -171,13 +177,22 @@ export class GearData extends foundry.abstract.TypeDataModel {
     return {
       ...itemCommon(),
       quantity: int(1),
+      stack: int(0, 0, 99),                                // Stack (N) from the gear table; 1 = doesn't stack; 0 = not set
       slotBonus: int(0, 0, 12),                            // +Inventory Slots while carried (Backpack = 3)
-      quickBonus: int(0, 0, 4),                            // +Quick Item Slots while carried
+      quickBonus: int(0, 0, 4),                            // +Quick Item Slots while carried (any item)
+      holster: str(),                                      // holster key (config HOLSTERS): +1 Quick Slot for one weapon of the right Size
       ready: bool(),                                       // held / readied (e.g. a Riot Shield in hand)
       defenceBonus: int(0, -6, 6),                         // +Defence while ready
       reflexesBonus: int(0, 0, 6),                         // +dice on Reflexes Tests while ready (pre-filled)
-      use: str("none"),                                    // none | heal | healthpack | adrenaline
-      healEcg: int(0)                                      // boxes cleared by a "heal" item
+      use: str("none"),                                    // none | heal | healthpack | adrenaline | sedative | light
+      healEcg: int(0),                                     // boxes cleared by a "heal" item (5 = all)
+      toughnessGain: int(0, 0, 6),                         // permanent +Toughness from a "heal" item (Bolstering Herb)
+      supply: str(),                                       // crafting supply key (config SUPPLIES), "" = not a supply
+      tool: str(),                                         // crafting tool key (config TOOLS), "" = not a tool
+      halfStrength: bool(),                                // crafted on a failed Test: half as effective
+      attachment: str(),                                   // gun attachment key (config ATTACHMENTS), "" = not one
+      fittedTo: str(),                                     // id of the gun it's fitted to ("" = loose in the inventory)
+      round: new fields.SchemaField({ damage: int(0), tags: str() })  // ammo that sets the gun's damage/Tags (Grenade Launcher rounds)
     };
   }
 }

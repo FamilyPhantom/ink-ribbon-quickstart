@@ -144,8 +144,27 @@
       <div class="ir-buttons">
         <button type="button" data-action="damage">Take Damage</button>
         {{#if isGM}}<button type="button" data-action="deathDie">Death Die</button>{{/if}}
+        {{#if heroic}}{{#if isGM}}<button type="button" data-action="endHeroic" data-tooltip="End of their turn: they die and Horror drops">End Sacrifice</button>{{else}}<span class="hint">Heroic Sacrifice in progress</span>{{/if}}
+        {{else}}<button type="button" data-action="heroic" data-tooltip="Heroic Sacrifice (The Rules p.33): last stand, then you die at the end of your turn">Heroic Sacrifice</button>{{/if}}
       </div>
     </div>
+
+    {{#if isGM}}{{#if infectionOn}}
+    <div class="ir-box ir-infection">
+      <h3>IR-Virus <span class="hint">GM only: players never see this panel</span></h3>
+      <p>{{#if system.infection.infected}}<b>Infected, Stage {{system.infection.stage}}</b>{{else}}Not infected{{/if}}</p>
+      <div class="ir-buttons">
+        <button type="button" data-action="infBitten" data-tooltip="Bitten or scratched: secret Strength (Endurance) Test, TN Horror + 1">Bitten / scratched</button>
+        {{#if system.infection.infected}}
+        <button type="button" data-action="infHour" data-tooltip="An hour passes: 1d6 &le; Horror = the next stage">Hour passes</button>
+        <button type="button" data-action="infTen" data-tooltip="Stage 4: 1 damage per 10 minutes">10 minutes (Stage 4)</button>
+        <button type="button" data-action="infDown" data-tooltip="Back one stage">Stage &minus;</button>
+        <button type="button" data-action="infUp" data-tooltip="Forward one stage (applies its effects)">Stage +</button>
+        <button type="button" data-action="infCure">Cure</button>
+        {{/if}}
+      </div>
+    </div>
+    {{/if}}{{/if}}
 
     <div class="ir-box">
       <h3>Combat <a class="ir-add" data-action="createItem" data-type="weapon" title="Add weapon">+</a></h3>
@@ -156,10 +175,10 @@
           <tr data-item-id="{{item.id}}">
             <td><a class="rollable" data-action="attack" title="Attack (target a token first)"><img src="{{item.img}}"> {{item.name}}</a></td>
             <td>{{pool}}d6</td>
-            <td>{{item.system.damage}}</td>
+            <td>{{damage}}</td>
             <td>{{#if item.system.shots.max}}<input type="number" class="tiny" data-item-field="system.shots.value" value="{{item.system.shots.value}}"> / {{item.system.shots.max}}
                 <a data-action="reload" title="Reload">&#x21bb;</a>{{else}}&ndash;{{/if}}</td>
-            <td class="small">{{item.system.tags}} ({{item.system.range}})</td>
+            <td class="small">{{tags}} ({{range}}){{#if mods}}<br><i>+ {{mods}}</i>{{/if}}</td>
             <td class="ir-controls"><a data-action="editItem">&#9998;</a><a data-action="deleteItem">&#10005;</a></td>
           </tr>
         {{else}}<tr><td colspan="6" class="hint">No weapons. Drag one here or click +.</td></tr>
@@ -177,10 +196,12 @@
 
         <div class="inv-band"><span>Quick Items</span>
           <span class="inv-count">{{inv.quickUsed}} / {{system.quickSlots.total}}
-            <small>base</small> <input type="number" class="tiny" name="system.quickSlots.max" value="{{system.quickSlots.max}}" min="0" max="4" data-tooltip="Base Quick Item Slots{{#if system.quickSlots.bonus}} (+{{system.quickSlots.bonus}} from gear){{/if}}"></span></div>
+            <small>base</small> <input type="number" class="tiny" name="system.quickSlots.max" value="{{system.quickSlots.max}}" min="0" max="4" data-tooltip="Base Quick Item Slots{{#if system.quickSlots.bonus}} (+{{system.quickSlots.bonus}} from gear){{/if}}. Holsters add their own (max 2)."></span></div>
+        {{#if inv.extraHolsters}}<p class="inv-warn">Only 2 holsters count: {{inv.extraHolsters}} extra holster(s) give no Quick Slot.</p>{{/if}}
         <div class="inv-quick">
           {{#each inv.quick}}
-          <div class="quick-cell {{#if locked}}locked{{/if}}" data-index="{{i}}">
+          <div class="quick-cell {{#if locked}}locked{{/if}} {{#if holster}}holster{{/if}}" data-index="{{i}}" {{#if holsterTip}}data-tooltip="{{holsterTip}}"{{/if}}>
+            {{#if holster}}{{#unless tile}}<span class="quick-kind">{{holster}}<br>holster</span>{{/unless}}{{/if}}
             {{#if tile}}<div class="inv-tile {{tile.type}} {{#if tile.selected}}selected{{/if}}" data-item-id="{{tile.id}}" data-action="selectItem" draggable="true" data-tooltip="{{tile.name}}">
               <img src="{{tile.img}}" alt=""><span class="tile-name">{{tile.name}}</span>{{#if tile.badge}}<span class="tile-badge">{{tile.badge}}</span>{{/if}}{{#if tile.ready}}<span class="tile-worn ready">Ready</span>{{/if}}</div>{{/if}}
           </div>
@@ -218,15 +239,20 @@
             <h4>{{item.name}}</h4>
             <div class="exam-meta">{{meta}}</div>
             {{#if isWeapon}}{{#if system.tags}}<div class="exam-tags">{{system.tags}}</div>{{/if}}{{/if}}
+            {{#if mods.length}}<div class="exam-mods">Fitted: {{#each mods}}<span data-item-id="{{id}}">{{name}} <a data-action="removeAttachment" data-tooltip="Take it off">&#10005;</a></span>{{/each}}</div>{{/if}}
             <div class="exam-fields">
               {{#if isGear}}<label>Qty <input type="number" class="tiny" data-item-field="system.quantity" value="{{system.quantity}}" min="0"></label>{{/if}}
               {{#if canReload}}<label>Shots <input type="number" class="tiny" data-item-field="system.shots.value" value="{{system.shots.value}}" min="0"> / {{system.shots.max}}</label>{{/if}}
             </div>
+            {{#if overStack}}<p class="inv-warn">{{#if (eq system.stack 1)}}This doesn't stack: each one takes its own Slot.{{else}}Over its Stack size ({{system.stack}}).{{/if}}
+              <button type="button" class="small" data-action="splitStack">Split</button></p>{{/if}}
             {{#if system.description}}<div class="exam-desc">{{system.description}}</div>{{/if}}
             <div class="exam-buttons">
               {{#if isWeapon}}<button type="button" data-action="attack">Attack</button>{{/if}}
               {{#if canReload}}<button type="button" data-action="reload">Reload</button>{{/if}}
-              {{#if canUse}}<button type="button" data-action="useItem">Use</button>{{/if}}
+              {{#if canUse}}<button type="button" data-action="useItem">{{useLabel}}</button>{{/if}}
+              {{#if isAttachment}}<button type="button" data-action="fitAttachment" data-tooltip="Fit it to a gun (no Slot while fitted)">Fit to gun</button>{{/if}}
+              {{#if canCraft}}<button type="button" data-action="craft" data-tooltip="Recipes that use this">Craft</button>{{/if}}
               {{#if canReady}}<button type="button" data-action="readyGear" data-tooltip="Ready gives its Defence / Reflexes bonus">{{#if system.ready}}Put away{{else}}Ready{{/if}}</button>{{/if}}
               {{#if isArmour}}<button type="button" data-action="wearArmour">{{#if system.equipped}}Take off{{else}}Wear{{/if}}</button>{{/if}}
               {{#if canRotate}}<button type="button" data-action="rotateItem">&#x21bb; Rotate</button>{{/if}}
@@ -252,6 +278,9 @@
         </div>
         {{/if}}
 
+        <div class="inv-add">
+          <button type="button" class="craft" data-action="craft" data-tooltip="Craft items from supplies (10 minutes)"><i class="fa-solid fa-hammer"></i> Crafting</button>
+        </div>
         <div class="inv-add">
           <button type="button" data-action="createItem" data-type="gear">+ Gear</button>
           <button type="button" data-action="createItem" data-type="weapon">+ Weapon</button>

@@ -9,14 +9,23 @@ built to run the Ink Ribbon Quick Start demo, *Dead on Arrival*.
 
 ## Features
 
-- Survivor, monster/NPC and Item Box (storage) actor sheets
-- Equipment and talent items with attack, weapon, armour and gear types
+- Survivor and monster/NPC sheets with automated Tests, attacks, damage and the ECG Health Tracker
+- Resident Evil style inventory grid with Quick Item Slots, stacks and worn armour
+- Equipment and talent items: weapons (including loaded rounds and fuel), armour and survival gear
+- Gun attachments: Silencer, Makeshift Silencer, Scope, Infrared Scope, Stock and Expanded Mag
+- **Crafting** from the Inventory tab: the crafting table's recipes, supplies and tools (with their
+  Advantages), the Wits Test, and the reduced results of a failed Test
 - A shared **Horror** tracker (1-5) at the top of the screen, with GM controls for
-  "Who's first?", starting an action scene, and ending a scene
-- **Safe Room** toggle so players can use the shared Item Box
+  "Who's first?", starting and ending an action scene, and **Safe Rooms**
+- **Finding Supplies:** the GM's Search button rolls the Finding Supplies tables for the current Horror,
+  with Give buttons that put the finds straight into a survivor's inventory
+- Holsters: up to two, each a Quick Item Slot for one weapon of the right Size
+- **Safe Rooms:** the GM opens one (or "Make it safe" with a secret roll). Rest, health packs and
+  crafting follow the Safe Room rules (no Test if you're Trained)
 - Conditions and start/end-of-turn automation (for example Bleeding, Burning, Adrenaline)
 - Starter compendiums (Equipment, Talents, Monsters) created automatically the first time
   a GM loads a world
+- Optional add-on module: *Ink Ribbon: Item Box*, a shared Resident Evil style Item Box in Safe Rooms
 
 ## Install
 
