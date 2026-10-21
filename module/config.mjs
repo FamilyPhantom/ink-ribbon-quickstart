@@ -110,3 +110,131 @@ export function deathResult(d) {
   if (d <= 5) return "On the brink: dies in 1d6 rounds without immediate medical care.";
   return "Bleeding out: dies in 1d6 minutes without help.";
 }
+
+/* -------------------------------------------- */
+/*  Crafting (rules p.46-47)                     */
+/* -------------------------------------------- */
+
+// Crafting supplies: gear items with system.supply set to one of these keys. Quantity = how many.
+export const SUPPLIES = {
+  green: "Green Flower", red: "Red Flower", yellow: "Yellow Flower",
+  resources: "Resources", alcohol: "Alcohol", gunpowder: "Gunpowder", explosives: "Explosives"
+};
+// Crafting tools: gear items with system.tool set to one of these keys. They help but aren't required.
+export const TOOLS = { craftingKit: "Crafting Kit", pestle: "Pestle & Mortar" };
+// Advantages a tool gives on crafting Tests, by recipe kind (rules p.40-42):
+// Crafting Kit: bullets and improvised explosives. Pestle and Mortar: healing items.
+export const TOOL_ADVANTAGE = {
+  craftingKit: { kinds: ["ammo", "throwable"], advantage: 1 },
+  pestle: { kinds: ["heal"], advantage: 1 }
+};
+
+// What a failed crafting Test does, by kind:
+// ammo = half the amount, heal = half as effective, throwable = half damage, silencer = +1 Complication when fitted.
+export const CRAFT_FAILURE = {
+  ammo: "Failed Test: you craft half the amount.",
+  heal: "Failed Test: it's half as effective (half the Toughness, half the ECG spaces...).",
+  throwable: "Failed Test: it deals half the damage.",
+  silencer: "Failed Test: it adds a Complication when equipped to a gun.",
+  "": "Failed Test: no extra effect listed (GM decides)."
+};
+
+// name, item created (matched by name), ingredients, tools, TN, Wits + one of these skills, amount, failure kind.
+const recipe = (name, output, inputs, tools, tn, skills, amount, kind) =>
+  ({ id: name, name, output, inputs, tools, tn, attribute: "wits", skills, amount, kind });
+const KIT = ["craftingKit"], PESTLE = ["pestle"];
+const SCI_ENG = ["science", "engineering"];
+
+export const RECIPES = [
+  recipe("Bolstering Herbs", "Bolstering Herb", { green: 1, yellow: 1 }, PESTLE, 5, ["medicine"], 1, "heal"),
+  recipe("Bolstering Herbs (Advanced)", "Bolstering Herb (Advanced)", { green: 1, red: 1, yellow: 1 }, PESTLE, 6, ["medicine"], 1, "heal"),
+  recipe("Explosive Rounds", "Explosive Rounds", { resources: 1, explosives: 2 }, KIT, 5, SCI_ENG, 2, "ammo"),
+  recipe("Flame Rounds", "Flame Rounds", { resources: 1, explosives: 1, alcohol: 1 }, KIT, 5, SCI_ENG, 2, "ammo"),
+  recipe("Handgun Ammo", "Handgun Ammo", { gunpowder: 1, resources: 1 }, KIT, 3, SCI_ENG, 12, "ammo"),
+  recipe("Healing Herbs (Lesser)", "Healing Herb (Lesser)", { green: 1 }, PESTLE, 2, ["medicine"], 1, "heal"),
+  recipe("Healing Herbs (Basic)", "Healing Herb (Basic)", { green: 2 }, PESTLE, 3, ["medicine"], 1, "heal"),
+  recipe("Healing Herbs (Improved)", "Healing Herb (Improved)", { green: 3 }, PESTLE, 4, ["medicine"], 1, "heal"),
+  recipe("Healing Herbs (Advanced)", "Healing Herb (Advanced)", { green: 1, red: 1 }, PESTLE, 5, ["medicine"], 1, "heal"),
+  recipe("Health Kit", "Health Pack", { alcohol: 1, resources: 1, green: 1 }, ["craftingKit", "pestle"], 5, ["science", "medicine"], 1, "heal"),
+  recipe("Magnum Ammo", "Magnum Ammo", { gunpowder: 3, resources: 1 }, KIT, 6, SCI_ENG, 6, "ammo"),
+  recipe("Makeshift Silencer", "Makeshift Silencer", { resources: 2 }, KIT, 3, ["engineering"], 1, "silencer"),
+  recipe("Molotov Cocktail", "Molotov Cocktail", { alcohol: 1, resources: 1 }, KIT, 4, SCI_ENG, 1, "throwable"),
+  recipe("Pipe Bomb", "Pipe Bomb", { alcohol: 1, explosives: 1, resources: 1 }, KIT, 5, SCI_ENG, 1, "throwable"),
+  recipe("Rifle Ammo", "Rifle Ammo", { gunpowder: 2, resources: 2 }, KIT, 5, SCI_ENG, 5, "ammo"),
+  recipe("Shotgun Shells", "Shotgun Shells", { gunpowder: 2, resources: 1 }, KIT, 4, SCI_ENG, 4, "ammo"),
+  recipe("Smoke Bomb", "Smoke Bomb", { explosives: 1, resources: 1 }, KIT, 4, SCI_ENG, 1, "throwable"),
+  recipe("Submachine Gun Ammo", "Submachine Gun Ammo", { gunpowder: 1, resources: 2 }, KIT, 4, SCI_ENG, 6, "ammo")
+];
+
+/* -------------------------------------------- */
+/*  Gun attachments (rules p.40-43)              */
+/* -------------------------------------------- */
+
+// Gear with system.attachment set can be fitted to a gun (Examine > Fit to gun). One per slot.
+// Fitted attachments don't fill an Inventory Slot, except a Stock, which adds 1 to the gun's Size.
+export const ATTACHMENTS = {
+  silencer:          { label: "Silencer", slot: "muzzle", tip: "Removes the Loud Tag." },
+  makeshiftSilencer: { label: "Makeshift Silencer", slot: "muzzle", tip: "Removes the Loud Tag for one Shot, then breaks." },
+  scope:             { label: "Scope", slot: "scope", tip: "Range Band +1 (max Long). Long Range gun: an Advantage instead." },
+  infrared:          { label: "Infrared Scope", slot: "scope", tip: "As a Scope; can remove Complications from smoke or darkness." },
+  stock:             { label: "Stock", slot: "stock", tip: "An Advantage on ranged attacks. Gun Size +1 while fitted." },
+  mag:               { label: "Expanded Mag", slot: "mag", tip: "Shots +50%." }
+};
+export const RANGE_BANDS = ["Adjacent", "Short", "Medium", "Long", "Extreme"];
+
+/* -------------------------------------------- */
+/*  Holsters (rules p.41)                        */
+/* -------------------------------------------- */
+
+// Each holster (gear with system.holster set) adds one Quick Item Slot that holds one weapon of the right Size.
+// Up to two holsters count, in any combination.
+export const HOLSTERS = {
+  handgun: { label: "Handgun Holster", short: "Handgun", fits: size => size === 1, needs: "a 1-Slot weapon" },
+  longgun: { label: "Long Gun Holster", short: "Long gun", fits: size => size >= 2 && size <= 3, needs: "a 2- or 3-Slot weapon" }
+};
+export const MAX_HOLSTERS = 2;
+
+/* -------------------------------------------- */
+/*  Finding Supplies (rules p.47-49)             */
+/* -------------------------------------------- */
+
+// Entries: an item name, or { t: table, x: multiplier, plus: upgrade }.
+// t: healing | healingTwice | useful | crafting | commonAmmo | rareAmmo | commonGun | rareGun | uniqueGun | uniqueAmmo | gun (name)
+const H = (t, extra = {}) => ({ t, ...extra });
+// 3d6 -> [Horror 1-2, Horror 3, Horror 4, Horror 5]
+export const FINDING_SUPPLIES = {
+  3:  ["Health Pack", "Handgun Holster", "Yellow Flower", "Tactical Webbing"],
+  4:  ["First-Aid Spray", "Backpack", "Long Gun Holster", "Yellow Flower"],
+  5:  ["Red Flower", "Health Pack", "Handgun Holster", "Long Gun Holster"],
+  6:  ["Green Flower", "Hip Pouch (Small)", "Health Pack", "Backpack"],
+  7:  [H("healing"), "Red Flower", "First-Aid Spray", "Health Pack"],
+  8:  ["One-handed Weapon", H("healing"), "Hip Pouch (Large)", "First-Aid Spray"],
+  9:  [H("useful"), H("commonAmmo"), H("healing"), H("healingTwice")],
+  10: [H("useful"), H("commonAmmo"), H("commonAmmo", { x: 2 }), H("commonAmmo", { x: 4 })],
+  11: [H("crafting"), H("crafting", { x: 2 }), H("crafting", { x: 3 }), H("crafting", { x: 4 })],
+  12: [H("crafting"), H("crafting", { x: 2 }), H("useful"), H("rareAmmo")],
+  13: ["Two-handed Weapon", H("useful"), H("rareAmmo"), H("rareAmmo", { x: 2 })],
+  14: [H("commonAmmo"), H("rareAmmo"), H("rareAmmo"), H("commonGun", { plus: true })],
+  15: [H("commonAmmo"), H("rareAmmo"), H("rareGun"), H("rareGun", { plus: true })],
+  16: [H("commonGun"), H("commonGun", { plus: true }), H("rareGun", { plus: true }), H("uniqueGun", { weapon: true })],
+  17: [H("commonGun"), H("rareGun"), H("uniqueGun"), H("gun", { name: "Minigun" })],
+  18: [H("rareGun"), H("uniqueGun"), H("uniqueAmmo"), H("gun", { name: "Rocket Launcher" })]
+};
+export const horrorColumn = horror => horror <= 2 ? 0 : horror === 3 ? 1 : horror === 4 ? 2 : 3;
+
+// [low, high, result] tables
+export const USEFUL_ITEM = [[3, 3, "Long Gun Holster"], [4, 4, "Handgun Holster"], [5, 5, "Sedative"], [6, 6, "Adrenaline Shot"],
+  [7, 8, "Flashlight"], [9, 10, "One-handed Weapon"], [11, 12, "Two-handed Weapon"], [13, 14, "Camping Lantern"],
+  [15, 15, "Hip Pouch (Small)"], [16, 16, "Hip Pouch (Large)"], [17, 17, "Backpack"], [18, 18, "Tactical Webbing"]];
+export const HEALING_ITEM = [[1, 3, "Green Flower"], [4, 4, "Red Flower"], [5, 5, "First-Aid Spray"], [6, 6, "Health Pack"]];
+export const CRAFTING_FIND = [[1, 3, "Resources"], [4, 4, "Alcohol"], [5, 5, "Gunpowder"], [6, 6, "Explosives"]];
+// Guns: weapon, Shots (left in the gun, or ammo found), the ammo item ("" = fuel with no item; several = GM picks).
+export const GUN_TABLES = {
+  common: [[1, 3, { weapon: "Handgun", shots: "2d6", ammo: ["Handgun Ammo"] }], [4, 5, { weapon: "Shotgun", shots: "1d3", ammo: ["Shotgun Shells"] }],
+           [6, 6, { weapon: "Submachine Gun", shots: "1d6", ammo: ["Submachine Gun Ammo"] }]],
+  rare:   [[1, 3, { weapon: "Rifle", shots: "1d6", ammo: ["Rifle Ammo"] }], [4, 4, { weapon: "Crossbow", shots: "1d6", ammo: ["Crossbow Bolts"] }],
+           [5, 5, { weapon: "Grenade Launcher", shots: "1d3", ammo: ["Explosive Rounds", "Flame Rounds"] }], [6, 6, { weapon: "Magnum", shots: "1d6", ammo: ["Magnum Ammo"] }]],
+  unique: [[1, 2, { weapon: "Chainsaw", shots: "2d6", ammo: [], fuel: true }], [3, 4, { weapon: "Flamethrower", shots: "1d6", ammo: ["Flamethrower Fuel"], fuel: true }],
+           [5, 5, { weapon: "Minigun", shots: "4d6", ammo: ["Minigun Ammo"] }], [6, 6, { weapon: "Rocket Launcher", shots: "1", ammo: ["Rocket"] }]]
+};
+export const lookup = (table, n) => table.find(([lo, hi]) => n >= lo && n <= hi)?.[2];
