@@ -7,7 +7,7 @@
 import { FINDING_SUPPLIES, horrorColumn, USEFUL_ITEM, HEALING_ITEM, CRAFTING_FIND, GUN_TABLES, lookup } from "./config.mjs";
 import { ITEMS } from "./starter.mjs";
 
-const SYS = "ink-ribbon";
+const SYS = "ink-ribbon-quickstart";
 const { DialogV2 } = foundry.applications.api;
 const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const roll = async formula => (await new Roll(formula).evaluate()).total;

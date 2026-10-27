@@ -12,6 +12,11 @@
       "name": "Conrad"
     }
   ],
+  "url": "https://github.com/conrad251125/ink-ribbon",
+  "license": "LICENSE",
+  "readme": "https://github.com/conrad251125/ink-ribbon#readme",
+  "bugs": "https://github.com/conrad251125/ink-ribbon/issues",
+  "changelog": "https://github.com/conrad251125/ink-ribbon/releases",
   "esmodules": [
     "ink-ribbon.mjs"
   ],

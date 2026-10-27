@@ -9,7 +9,7 @@
  * Other packages can react with the "inkRibbon.safeRoom" hook (open: boolean).
  */
 
-const SYS = "ink-ribbon";
+const SYS = "ink-ribbon-quickstart";
 
 export const isSafeRoomOpen = () => !!game.settings.get(SYS, "safeRoom");
 

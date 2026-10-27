@@ -33,7 +33,7 @@ built to run the Ink Ribbon Quick Start demo, *Dead on Arrival*.
 2. Paste this manifest URL and click **Install**:
 
    ```
-   https://github.com/YOURUSER/ink-ribbon/releases/latest/download/system.json
+   https://github.com/conrad251125/ink-ribbon/releases/latest/download/system.json
    ```
 
 3. Create a world and choose **Ink Ribbon (Quick Start)** as its system.
@@ -65,7 +65,7 @@ compendiums resets them.
 
 Releases are built automatically. Publishing a GitHub release (for example tag `v0.4.1`)
 runs the workflow in `.github/workflows/release.yml`, which fills in the manifest URLs and
-attaches `system.json` and `ink-ribbon.zip`.
+attaches `system.json` and `ink-ribbon-quickstart.zip`.
 
 ## Legal
 
@@ -78,4 +78,4 @@ attaches `system.json` and `ink-ribbon.zip`.
 
 ## Issues
 
-Bug reports and suggestions: <https://github.com/YOURUSER/ink-ribbon/issues>
+Bug reports and suggestions: <https://github.com/conrad251125/ink-ribbon/issues>

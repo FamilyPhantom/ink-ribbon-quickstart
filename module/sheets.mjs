@@ -17,7 +17,7 @@ export const invDrag = { current: null };
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2, ItemSheetV2 } = foundry.applications.sheets;
-const PATH = "systems/ink-ribbon/templates";
+const PATH = "systems/ink-ribbon-quickstart/templates";
 
 /* -------------------------------------------- */
 /*  Shared actor sheet behaviour                */
@@ -71,7 +71,7 @@ class InkActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     ctx.tab = this.tab;
     ctx.isGM = game.user.isGM;
     ctx.infectionOn = infection.infectionOn();
-    ctx.heroic = !!actor.getFlag("ink-ribbon", "heroic");
+    ctx.heroic = !!actor.getFlag("ink-ribbon-quickstart", "heroic");
     ctx.attributes = Object.entries(ATTRIBUTES).map(([key, label]) => ({ key, label, value: s.attributes[key] }));
     ctx.skills = Object.entries(SKILLS).map(([key, [label, attr]]) => {
       const training = s.skills[key].training;

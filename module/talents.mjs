@@ -12,7 +12,7 @@
 import { SKILLS } from "./config.mjs";
 import { ITEMS } from "./starter.mjs";
 
-const SYS = "ink-ribbon";
+const SYS = "ink-ribbon-quickstart";
 const MAX_TRAINING = 2;                                   // "If a Talent increases your Training with a Skill, it can't go above level 2."
 const PACKABLE = ["weapon", "armour", "gear"];
 const { DialogV2 } = foundry.applications.api;
