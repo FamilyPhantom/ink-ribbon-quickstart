@@ -184,7 +184,14 @@ export const ITEMS = [
   { name: "Medical Training", type: "talent", img: "icons/svg/book.svg", system: { ignoreStress: 2, ignoreSkills: "medicine", description: "Ignore up to 2 Stress on Medicine Tests (pre-filled)." } },
   { name: "Immune", type: "talent", img: "icons/svg/book.svg", system: { description: "Immune to the common strain of the IR-Virus (the infection Test is skipped automatically)." } },
   { name: "Hard to Kill", type: "talent", img: "icons/svg/book.svg", system: { toughness: 2, description: "+2 Toughness (applied automatically)." } },
-  { name: "Nimble", type: "talent", img: "icons/svg/book.svg", system: { defence: 1, advantage: 1, advSkill: "reflexes", advNote: "to dodge", description: "+1 Defence (automatic) and an Advantage on Reflexes Tests to dodge (pre-filled)." } }
+  { name: "Nimble", type: "talent", img: "icons/svg/book.svg", system: { defence: 1, advantage: 1, advSkill: "reflexes", advNote: "to dodge", description: "+1 Defence (automatic) and an Advantage on Reflexes Tests to dodge (pre-filled)." } },
+  { name: "Always Prepared", type: "talent", img: "icons/svg/book.svg", system: { kit: "Backpack, Flashlight, First-Aid Spray, One-handed Weapon > Pocket Knife", description: "Starts with a backpack, flashlight, first-aid spray and pocket knife (added automatically). QS Rules p.16." } },
+  { name: "Calm Mind", type: "talent", img: "icons/svg/book.svg", system: { panicBest: true, description: "Panic Tests: roll two dice, use the better one (automatic). QS Rules p.16." } },
+  { name: "Chemist", type: "talent", img: "icons/svg/book.svg", system: { training: "medicine, science", kit: "Pestle & Mortar", description: "Pestle & Mortar; +1 Training in Medicine and Science, max 2 (added automatically). QS Rules p.16." } },
+  { name: "Hobby", type: "talent", img: "icons/svg/book.svg", system: { trainingChoice: 2, description: "+1 Training in two Skills of your choice, max 2 (you pick them when it's added). QS Rules p.16." } },
+  { name: "Sneak", type: "talent", img: "icons/svg/book.svg", system: { training: "engineering, stealth", kit: "Lockpicks", description: "Lockpicks; +1 Training in Engineering and Stealth, max 2 (added automatically). QS Rules p.16." } },
+  { name: "Tinkerer", type: "talent", img: "icons/svg/book.svg", system: { training: "engineering, reasoning", kit: "Crafting Kit", description: "Crafting Kit; +1 Training in Engineering and Reasoning, max 2 (added automatically). QS Rules p.16." } },
+  { name: "Will to Live", type: "talent", img: "icons/svg/book.svg", system: { lowAdvantage: 1, description: "Advantage on all Tests at 0 Toughness while in Caution or Danger (pre-filled). QS Rules p.16." } }
 ];
 
 /** Create everything in folders. Existing starter documents (same name) can be refreshed to the latest data. */

@@ -68,7 +68,12 @@
       <div class="form-group"><label>+ Defence</label><input type="number" name="system.defence" value="{{system.defence}}"></div>
       <div class="form-group"><label>+ Advantage dice</label><input type="number" name="system.advantage" value="{{system.advantage}}" min="0"></div>
       <div class="form-group"><label>...on this skill / when</label><span class="pair"><input type="text" name="system.advSkill" value="{{system.advSkill}}" placeholder="reflexes"><input type="text" name="system.advNote" value="{{system.advNote}}" placeholder="to dodge"></span></div>
-      <p class="hint">Skill keys: lowercase skill names (fighting, shooting, medicine, reflexes...). Bonuses apply automatically.</p>
+      <div class="form-group"><label>+1 Training when added</label><input type="text" name="system.training" value="{{system.training}}" placeholder="medicine, science"></div>
+      <div class="form-group"><label>+1 Training: player picks</label><input type="number" name="system.trainingChoice" value="{{system.trainingChoice}}" min="0" max="4"></div>
+      <div class="form-group"><label>Starting items when added</label><input type="text" name="system.kit" value="{{system.kit}}" placeholder="Backpack, One-handed Weapon &gt; Pocket Knife"></div>
+      <div class="form-group"><label>Panic Tests: best of two dice</label><input type="checkbox" name="system.panicBest" {{checked system.panicBest}}></div>
+      <div class="form-group"><label>+ Advantage at 0 Toughness (Caution/Danger)</label><input type="number" name="system.lowAdvantage" value="{{system.lowAdvantage}}" min="0"></div>
+      <p class="hint">Skill keys: lowercase skill names (fighting, shooting, medicine, reflexes...). Bonuses apply automatically. Training and starting items are given once, when the Talent is added to a survivor (Training max 2); removing the Talent takes the Training back.</p>
     {{/if}}
 
     {{#unless (or isType.talent isType.attack)}}

@@ -1,6 +1,7 @@
 // Automated rules that run around the dice: start/end of turn, condition side effects,
 // monster traits (fear, weak points, Back From the Dead, mutation) and combat-tracker hooks.
 import { MONSTERS } from "./starter.mjs";
+import { showRoll } from "./dice.mjs";
 
 const SYS = "ink-ribbon";
 const horror = () => game.settings.get(SYS, "horror");
@@ -68,6 +69,7 @@ export async function startTurn(actor) {
 
   if (t.reviving) {
     const r = await new Roll("1d3").evaluate();
+    await showRoll(r, actor, `${actor.name}: Back From the Dead`, `It gets back up with ${r.total} Toughness.`, { gmOnly: actor.type !== "character" });
     update["system.toughness.value"] = Math.min(s.toughness.max, s.toughness.value + r.total);
     update["system.traits.reviving"] = false;
     lines.push(`<b>Back From the Dead:</b> it gets back up with ${r.total} Toughness.`);
@@ -83,6 +85,7 @@ export async function startTurn(actor) {
   const rec = s.recover;
   if (rec?.condition && actor.statuses.has(rec.condition)) {
     const r = await new Roll("1d6").evaluate();
+    await showRoll(r, actor, `${actor.name}: ${rec.condition}`, `1d6 = ${r.total} vs Horror ${horror()}${r.total <= horror() ? ": shakes it off." : "."}`, { gmOnly: actor.type !== "character" });
     const left = rec.rounds - 1;
     if (r.total <= horror() || left <= 0) {
       await removeCondition(actor, rec.condition);
@@ -120,6 +123,7 @@ export async function endTurn(actor) {
   if (!actor?.system.traits?.extraTurn || actor.statuses.has("dead")) return;
   const r = await new Roll("1d6").evaluate();
   const again = r.total <= horror();
+  await showRoll(r, actor, `${actor.name}: My Turn`, `1d6 = ${r.total} vs Horror ${horror()}${again ? ": another turn!" : "."}`, { gmOnly: actor.type !== "character" });
   return card(actor, `${actor.name}: My Turn`, [`Rolled ${r.total} vs Horror ${horror()}: ${again ? "<b>it takes another turn!</b>" : "no extra turn."}`]);
 }
 

@@ -1,4 +1,5 @@
 import { ATTRIBUTES, SKILLS, CONDITIONS, panicEffect, deathResult, SUPPLIES, TOOLS, TOOL_ADVANTAGE, RECIPES, CRAFT_FAILURE, ATTACHMENTS, RANGE_BANDS, HOLSTERS, MAX_HOLSTERS } from "./config.mjs";
+import { showRoll } from "./dice.mjs";
 import { addCondition, removeCondition, damageButton, conditionButton, hitWeakPoint, mutate } from "./rules.mjs";
 import { ITEMS } from "./starter.mjs";
 import { resolveInventory, fittedGun, sizeOf } from "./inventory.mjs";
@@ -217,6 +218,13 @@ export class InkActor extends Actor {
         advReasons.push(`${t.name} +${ts.advantage}${ts.advNote ? ` (${ts.advNote})` : ""}`);
       }
     }
+    // Will to Live: Advantage on every Test at 0 Toughness while in Caution or Danger.
+    if (isPC && s.toughness.value <= 0 && ["Caution", "Danger"].includes(s.ecg.state)) {
+      for (const t of this.items.filter(i => i.type === "talent" && i.system.lowAdvantage > 0)) {
+        advantage += t.system.lowAdvantage;
+        advReasons.push(`${t.name} +${t.system.lowAdvantage} (0 Toughness, ${s.ecg.state})`);
+      }
+    }
 
     const content = `<div class="ir-dialog">
       ${fixedPool === null ? `<div class="form-group"><label>Attribute</label><select name="attribute">${attrOptions}</select></div>` : ""}
@@ -395,17 +403,19 @@ export class InkActor extends Actor {
     if (makeshift) { notes.push(`The Makeshift Silencer breaks after this Shot.`); await this.items.get(makeshift.id)?.delete(); }
     if (tag("Loud")) notes.push("Loud: everyone (and everything) within Long Range hears it.");
     if (f.throw) notes.push(`${item.name} is thrown: it's no longer in hand.`);
-    let breaks = false;
+    let breaks = false, brittleRoll = null;
     if (tag("Brittle")) {
-      const b = await new Roll("1d6").evaluate();
-      breaks = b.total <= getHorror();
-      if (breaks) notes.push(`Brittle: rolled ${b.total} &le; Horror. <b>${item.name} breaks!</b> +1 Stress.`);
+      brittleRoll = await new Roll("1d6").evaluate();
+      breaks = brittleRoll.total <= getHorror();
+      if (breaks) notes.push(`Brittle: rolled ${brittleRoll.total} &le; Horror. <b>${item.name} breaks!</b> +1 Stress.`);
     }
     if (isWeapon && w.singleUse) notes.push(`${item.name} is used up.`);
     if (isWeapon && w.category === "thrown" && w.description) notes.push(`<i>${w.description}</i>`);
 
     if (successes) await this.#damageCard(item, prof.damage + extras, extras, { target, notes, headshot, weak, explosive, prof });
     else if (notes.length) await chat(this, `<div class="ir-card"><h3>${item.name}: miss</h3>${notes.map(n => `<p>${n}</p>`).join("")}</div>`);
+    if (brittleRoll) await showRoll(brittleRoll, this, `${item.name}: Brittle check`,
+      `1d6 = ${brittleRoll.total} vs Horror ${getHorror()}: ${breaks ? `<b class="failure">it breaks!</b> +1 Stress.` : "it holds."}`);
     if (breaks) await this.gainStress(1);
     if (breaks || (isWeapon && w.singleUse)) await item.delete();
   }
@@ -582,6 +592,8 @@ export class InkActor extends Actor {
     else if (defeated && t.backFromDead && !t.bftdUsed) {
       update["system.traits.bftdUsed"] = true;
       const r = await new Roll("1d6").evaluate();
+      await showRoll(r, this, `${this.name}: Back From the Dead`,
+        `1d6 = ${r.total} vs Horror ${getHorror()}: ${r.total <= getHorror() ? "<b>it isn't dead.</b> It gets back up next turn." : "it stays down."}`, { gmOnly: true });
       if (r.total <= getHorror()) {
         defeated = false;
         update["system.traits.reviving"] = true;
@@ -593,6 +605,8 @@ export class InkActor extends Actor {
       update["system.traits.mutationChecked"] = true;
       const r = await new Roll("1d6").evaluate();
       mutateNow = r.total <= getHorror();
+      await showRoll(r, this, `${this.name}: Violent Mutation`,
+        `1d6 = ${r.total} vs Horror ${getHorror()}: ${mutateNow ? "<b>it mutates!</b>" : "no change."}`, { gmOnly: true });
       notes.push(`Violent Mutation check: rolled ${r.total} vs Horror ${getHorror()}${mutateNow ? ". <b>It mutates!</b>" : ": no change."}`);
     }
 
@@ -634,7 +648,9 @@ export class InkActor extends Actor {
     const horror = getHorror();
     const stress = this.system.stress.value;
     const tn = Math.max(stress, horror, 2);
-    const roll = await new Roll("1d6").evaluate();
+    // Calm Mind: roll two dice and use either result (the higher one is always the better pick).
+    const calm = this.type === "character" ? this.items.find(i => i.type === "talent" && i.system.panicBest) : null;
+    const roll = await new Roll(calm ? "2d6kh" : "1d6").evaluate();
     let text;
     if (roll.total >= tn) {
       text = `<div class="ir-result success">HOLDS IT TOGETHER</div>`;
@@ -652,7 +668,7 @@ export class InkActor extends Actor {
     await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this }),
       flavor: `<div class="ir-card"><h3>Panic Test</h3>
-        <div class="ir-math">TN ${tn} (Stress ${stress}, Horror ${horror}, min 2)</div>${text}</div>`
+        <div class="ir-math">TN ${tn} (Stress ${stress}, Horror ${horror}, min 2)${calm ? ` &middot; ${calm.name}: best of two dice` : ""}</div>${text}</div>`
     });
   }
 

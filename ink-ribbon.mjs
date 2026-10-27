@@ -15,11 +15,13 @@ import { registerSafeRoom, isSafeRoomOpen, toggleSafeRoom, makeItSafe } from "./
 import { findSupplies, bindSupplyButtons } from "./module/supplies.mjs";
 import * as infection from "./module/infection.mjs";
 import { horrorCheck, rollZombieTrait } from "./module/scenario.mjs";
+import { registerTalentHooks, applyTalent } from "./module/talents.mjs";
 
 const SYS = "ink-ribbon";
 
 Hooks.once("init", () => {
   console.log("Ink Ribbon | Initialising");
+  registerTalentHooks();                                   // Talents that grant Training / starting items when added
 
   // Data models: the schema for each Actor/Item type (replaces template.json).
   // Assigned key by key so modules can add their own sub-types (e.g. the Item Box module).
@@ -137,7 +139,7 @@ Hooks.once("setup", () => {
     renderHorrorBar: () => HorrorTracker.instance?.render(),
     crafting: { RECIPES, SUPPLIES, TOOLS },
     safeRoom: { isOpen: isSafeRoomOpen, toggle: toggleSafeRoom, makeItSafe },
-    infection, horrorCheck, rollZombieTrait,
+    infection, horrorCheck, rollZombieTrait, applyTalent,
     findSupplies,  // hook: "inkRibbon.safeRoom" (open)               // actor.promptCraft() / actor.craft(recipeId, { safeRoom })
     inventory: { drag: invDrag, PACKABLE, shapeOf, resolveInventory, placementUpdate, itemTiles }
   };
