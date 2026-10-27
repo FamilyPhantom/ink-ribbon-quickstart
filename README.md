@@ -33,7 +33,7 @@ built to run the Ink Ribbon Quick Start demo, *Dead on Arrival*.
 2. Paste this manifest URL and click **Install**:
 
    ```
-   https://github.com/conrad251125/ink-ribbon/releases/latest/download/system.json
+   https://github.com/FamilyPhantom/ink-ribbon-quickstart/releases/latest/download/system.json
    ```
 
 3. Create a world and choose **Ink Ribbon (Quick Start)** as its system.
@@ -78,4 +78,4 @@ attaches `system.json` and `ink-ribbon-quickstart.zip`.
 
 ## Issues
 
-Bug reports and suggestions: <https://github.com/conrad251125/ink-ribbon/issues>
+Bug reports and suggestions: <https://github.com/FamilyPhantom/ink-ribbon-quickstart/issues>

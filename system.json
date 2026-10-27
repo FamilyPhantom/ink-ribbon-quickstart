@@ -2,21 +2,23 @@
   "id": "ink-ribbon-quickstart",
   "title": "Ink Ribbon Quick-Start",
   "description": "Unofficial fan-made helper system for running the Ink Ribbon Quick Start Demo (Dead on Arrival). Rules text not included.",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "compatibility": {
     "minimum": "14",
     "verified": "14"
   },
   "authors": [
     {
-      "name": "Conrad"
+      "name": "FamilyPhantom",
+      "url": "https://github.com/FamilyPhantom",
+      "discord": "FamilyPhantom"
     }
   ],
-  "url": "https://github.com/conrad251125/ink-ribbon",
+  "url": "https://github.com/FamilyPhantom/ink-ribbon-quickstart",
   "license": "LICENSE",
-  "readme": "https://github.com/conrad251125/ink-ribbon#readme",
-  "bugs": "https://github.com/conrad251125/ink-ribbon/issues",
-  "changelog": "https://github.com/conrad251125/ink-ribbon/releases",
+  "readme": "https://github.com/FamilyPhantom/ink-ribbon-quickstart#readme",
+  "bugs": "https://github.com/FamilyPhantom/ink-ribbon-quickstart/issues",
+  "changelog": "https://github.com/FamilyPhantom/ink-ribbon-quickstart/releases",
   "esmodules": [
     "ink-ribbon.mjs"
   ],
