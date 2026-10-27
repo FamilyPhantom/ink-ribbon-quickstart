@@ -207,7 +207,12 @@ export class TalentData extends foundry.abstract.TypeDataModel {
       defence: int(0, -6, 6),                              // +Defence
       advantage: int(0, 0, 6),                             // +dice pre-filled on Tests with...
       advSkill: str(),                                     // ...this skill key, e.g. "reflexes"
-      advNote: str()                                       // when it applies, e.g. "to dodge"
+      advNote: str(),                                      // when it applies, e.g. "to dodge"
+      training: str(),                                     // +1 Training in these skills when added, e.g. "medicine, science"
+      trainingChoice: int(0, 0, 4),                        // +1 Training in this many skills the player picks (Hobby)
+      kit: str(),                                          // starting items when added, e.g. "Backpack, One-handed Weapon > Pocket Knife"
+      panicBest: bool(),                                   // Panic Tests: roll two dice, keep the better (Calm Mind)
+      lowAdvantage: int(0, 0, 6)                           // +dice on all Tests at 0 Toughness in Caution/Danger (Will to Live)
     };
   }
 }

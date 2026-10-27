@@ -2,7 +2,7 @@
   "id": "ink-ribbon",
   "title": "Ink Ribbon (Quick Start)",
   "description": "Unofficial fan-made helper system for running the Ink Ribbon Quick Start Demo (Dead on Arrival). Rules text not included.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "compatibility": {
     "minimum": "14",
     "verified": "14"
