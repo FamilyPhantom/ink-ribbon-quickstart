@@ -7,7 +7,7 @@ import { isSafeRoomOpen, safeRoomNoTest } from "./safeRoom.mjs";
 import { snapOutOfMalaise } from "./infection.mjs";
 
 const { DialogV2 } = foundry.applications.api;
-const SYS = "ink-ribbon";
+const SYS = "ink-ribbon-quickstart";
 
 export const getHorror = () => game.settings.get(SYS, "horror");
 

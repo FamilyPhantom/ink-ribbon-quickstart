@@ -3,7 +3,7 @@
 import { MONSTERS } from "./starter.mjs";
 import { showRoll } from "./dice.mjs";
 
-const SYS = "ink-ribbon";
+const SYS = "ink-ribbon-quickstart";
 const horror = () => game.settings.get(SYS, "horror");
 export const gmIds = () => game.users.filter(u => u.isGM).map(u => u.id);
 

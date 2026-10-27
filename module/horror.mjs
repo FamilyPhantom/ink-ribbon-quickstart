@@ -7,7 +7,7 @@ import { isSafeRoomOpen, toggleSafeRoom, makeItSafe } from "./safeRoom.mjs";
 import { findSupplies } from "./supplies.mjs";
 import { horrorCheck } from "./scenario.mjs";
 
-const SYS = "ink-ribbon";
+const SYS = "ink-ribbon-quickstart";
 
 export class HorrorTracker {
   static instance = null;
