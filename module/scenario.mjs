@@ -1,7 +1,7 @@
 // Helpers for rules the Dead on Arrival booklet uses over and over.
 import { addCondition, card, gmIds } from "./rules.mjs";
 
-const SYS = "ink-ribbon";
+const SYS = "ink-ribbon-quickstart";
 const horror = () => game.settings.get(SYS, "horror");
 
 /**

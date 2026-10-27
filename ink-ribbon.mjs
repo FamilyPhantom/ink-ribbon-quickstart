@@ -17,7 +17,7 @@ import * as infection from "./module/infection.mjs";
 import { horrorCheck, rollZombieTrait } from "./module/scenario.mjs";
 import { registerTalentHooks, applyTalent } from "./module/talents.mjs";
 
-const SYS = "ink-ribbon";
+const SYS = "ink-ribbon-quickstart";
 
 Hooks.once("init", () => {
   console.log("Ink Ribbon | Initialising");

@@ -5,7 +5,7 @@
 // shows on the sheet. The player sees what their character feels, never "Stage 2".
 import { addCondition, card, gmIds } from "./rules.mjs";
 
-const SYS = "ink-ribbon";
+const SYS = "ink-ribbon-quickstart";
 const horror = () => game.settings.get(SYS, "horror");
 export const infectionOn = () => game.settings.get(SYS, "infection");
 
