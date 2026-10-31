@@ -2,7 +2,7 @@ import { ATTRIBUTES, SKILLS, CONDITIONS, SUPPLIES, TOOLS, ATTACHMENTS, HOLSTERS 
 import { removeCondition, manualTurn, grotesque, roar } from "./rules.mjs";
 import { ecgContext } from "./ecg.mjs";
 import * as infection from "./infection.mjs";
-import { rollZombieTrait } from "./scenario.mjs";
+import { rollZombieTrait, rollZombieAttack, zombieAttackRollOn } from "./scenario.mjs";
 import { PACKABLE, COLS, shapeOf, sizeOf, quickFits, resolveInventory, placementUpdate, inventoryContext } from "./inventory.mjs";
 
 /** The item currently being dragged out of an inventory grid (shared by all open sheets). */
@@ -173,7 +173,8 @@ class InkActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onEscape(event, target) {
     const [attribute, skill] = target.dataset.via === "reflexes" ? ["agility", "reflexes"] : ["strength", "athletics"];
     const res = await this.document.promptTest({ label: "Escape (Caught)", attribute, skill, tn: 4,
-      hints: ["Caught by a creature: this is an Opposed Test (the GM compares). Otherwise the GM sets the TN."] });
+      hints: ["Caught by a creature: this is an Opposed Test (the GM compares). Otherwise the GM sets the TN."],
+      followUp: { kind: "escape" } });
     if (res?.result.successes) await removeCondition(this.document, "caught");
   }
   static #onRest() { this.document.safeRoomRest(); }
@@ -535,7 +536,9 @@ export class InkMonsterSheet extends InkActorSheet {
       fearLater: InkMonsterSheet.#onFearLater,
       roar: InkMonsterSheet.#onRoar,
       toggleAbilities: InkMonsterSheet.#onToggleAbilities,
-      zombieTrait: InkMonsterSheet.#onZombieTrait
+      zombieTrait: InkMonsterSheet.#onZombieTrait,
+      zombieAttack: InkMonsterSheet.#onZombieAttack,
+      attack: InkMonsterSheet.#onAttackClick
     }
   };
 
@@ -546,6 +549,20 @@ export class InkMonsterSheet extends InkActorSheet {
   static #onFearLater() { if (game.user.isGM) grotesque(this.document, false); }
   static #onRoar() { if (game.user.isGM) roar(this.document); }
   static #onZombieTrait() { rollZombieTrait(this.document); }
+
+  /** Optional zombie attack roll: shows which attack to use on this sheet (no chat message). */
+  suggested = null;
+  static async #onZombieAttack() {
+    const res = await rollZombieAttack(this.document);
+    this.suggested = res ? { id: res.attack.id, roll: res.roll, name: res.attack.name } : null;
+    this.render();
+  }
+  /** Rolling an attack from the list also clears the suggestion. */
+  static #onAttackClick(event, target) {
+    const item = this._item(target);
+    if (item) this.document.rollAttack(item);
+    if (this.suggested) { this.suggested = null; this.render(); }
+  }
   static PARTS = { sheet: { template: `${PATH}/monster.hbs`, scrollable: [".ir-body"] } };
 
   async _prepareContext(options) {
@@ -555,6 +572,8 @@ export class InkMonsterSheet extends InkActorSheet {
     const t = this.document.system.traits;
     ctx.hasFear = t.grotesque || t.roar;
     ctx.isZombie = /zombie/i.test(this.document.name) || /zombie/i.test(this.document.system.tags);
+    ctx.zombieAttackRoll = ctx.isZombie && zombieAttackRollOn();
+    ctx.suggested = this.suggested;
     ctx.traitSummary = [
       t.vsRanged && `+${t.vsRanged} Defence vs ranged`, t.vsMelee && `+${t.vsMelee} Defence vs melee`,
       t.aimForHead && "Aim For the Head", t.backFromDead && `Back From the Dead${t.bftdUsed ? " (used)" : ""}`,
