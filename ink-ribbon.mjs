@@ -57,6 +57,12 @@ Hooks.once("init", () => {
     name: "Infection rules", hint: "Use the IR-Virus infection rules (Dead on Arrival p.50): bite Test, hourly spread, stages. The booklet says you can ignore them.",
     scope: "world", config: true, type: Boolean, default: true
   });
+  // Optional rule: zombies roll 1d6 to choose their attack (1-4 Scratch/Grab, 5-6 Bite). Off by default.
+  game.settings.register(SYS, "zombieAttackRoll", {
+    name: "Zombie attack roll", hint: "Optional rule: when a zombie attacks, roll 1d6 to pick its attack (1-4 Scratch or Grab, 5-6 Bite). Adds a 'Which attack?' button to zombie sheets.",
+    scope: "world", config: true, type: Boolean, default: false,
+    onChange: () => { for (const app of foundry.applications.instances.values()) if (app.document instanceof Actor) app.render(); }
+  });
   // Safe Room (rules p.34): the GM opens it from the Horror bar; rest, health packs and crafting read it.
   registerSafeRoom();
 });
@@ -84,6 +90,26 @@ Hooks.on("preCreateActor", (actor, data) => {
   } else if (actor.type === "monster") {
     actor.updateSource({ "prototypeToken.disposition": CONST.TOKEN_DISPOSITIONS.HOSTILE });
   }
+});
+
+/** Right-click a failed Test in chat: "Re-roll using Adrenaline". Shown only when the re-roll is allowed. */
+Hooks.on("getChatMessageContextOptions", (app, options) => {
+  const messageOf = args => {
+    const el = args.find(a => a instanceof HTMLElement);
+    return game.messages.get(el?.closest("[data-message-id]")?.dataset.messageId);
+  };
+  options.push({
+    label: "Re-roll using Adrenaline",
+    icon: '<i class="fa-solid fa-heart-pulse"></i>',
+    visible: (...args) => {
+      const m = messageOf(args);
+      return !!m && !InkActor.rerollBlocker(m);
+    },
+    onClick: (...args) => {
+      const m = messageOf(args);
+      if (m) InkActor.rerollTest(m);
+    }
+  });
 });
 
 /** Chat card buttons: damage and conditions, applied to the selected tokens. */

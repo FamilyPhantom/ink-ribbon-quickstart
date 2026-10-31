@@ -455,3 +455,49 @@
 .ink-ribbon .quick-cell.holster { border-style: dashed; }
 .ink-ribbon .quick-cell .quick-kind { display: flex; align-items: center; justify-content: center; height: 100%; text-align: center;
   font-size: 10px; line-height: 1.1; text-transform: uppercase; letter-spacing: 1px; color: #777; pointer-events: none; }
+
+/* Adrenaline re-roll dialog: click dice to mark them for re-roll (no script: checkboxes + CSS counters) */
+.ir-reroll { background: #151311; border: 1px solid #5a1410; border-radius: 3px; padding: 10px 12px 8px; color: #ddd;
+  font-family: "Special Elite", "Courier New", monospace; box-shadow: 0 0 14px rgba(142, 26, 20, .35) inset; }
+.ir-reroll-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #5a1410;
+  padding-bottom: 4px; font-family: "Oswald", sans-serif; text-transform: uppercase; letter-spacing: 1px; font-size: 13px; }
+.ir-reroll-head b { font-size: 18px; color: #fff; }
+.ir-reroll-head .adr { color: #ff5446; }
+.ir-reroll-head .adr b { color: #ff5446; text-shadow: 0 0 6px #c3241b; }
+.ir-reroll-help { margin: 6px 0 2px; font-size: 11px; color: #9a9389; font-style: italic; text-align: center; }
+
+.ir-dice { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; padding: 12px 4px 10px; counter-reset: reroll keep; }
+.ir-die { position: relative; cursor: pointer; display: block; }
+.ir-die input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.ir-die input:checked { counter-increment: reroll; }
+.ir-die.hit input:not(:checked) { counter-increment: keep; }
+.ir-die .face { width: 46px; height: 46px; box-sizing: border-box; padding: 6px; border-radius: 8px; display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr); place-items: center;
+  background: linear-gradient(145deg, #f6f1e6, #d9d0bf); border: 2px solid #8a8276;
+  box-shadow: 0 3px 0 #6b645a, 0 5px 8px rgba(0, 0, 0, .6); transition: transform .12s, box-shadow .12s, border-color .12s, opacity .12s; }
+.ir-die .pip { width: 8px; height: 8px; border-radius: 50%; background: #1c1a17; box-shadow: inset 0 1px 1px rgba(255, 255, 255, .25); }
+.ir-die .pip.p1 { grid-area: 1 / 1; } .ir-die .pip.p3 { grid-area: 1 / 3; }
+.ir-die .pip.p4 { grid-area: 2 / 1; } .ir-die .pip.p5 { grid-area: 2 / 2; } .ir-die .pip.p6 { grid-area: 2 / 3; }
+.ir-die .pip.p7 { grid-area: 3 / 1; } .ir-die .pip.p9 { grid-area: 3 / 3; }
+.ir-die.hit .face { border-color: #3f7a2b; box-shadow: 0 3px 0 #2f5e22, 0 0 10px rgba(127, 195, 95, .45); }
+.ir-die.hit .pip { background: #2f5e22; }
+.ir-die.miss .face { opacity: .8; }
+.ir-die:hover .face { transform: translateY(-2px); }
+.ir-die input:focus-visible + .face { outline: 2px solid #ff5446; outline-offset: 2px; }
+/* Marked for re-roll: tilted, red rim, badge */
+.ir-die input:checked + .face { transform: rotate(-8deg); border-color: #c3241b; opacity: 1;
+  box-shadow: 0 3px 0 #5a1410, 0 0 12px rgba(255, 84, 70, .7); background: linear-gradient(145deg, #f3e3dc, #d6c2b8); }
+.ir-die .badge { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; border-radius: 50%; display: none;
+  place-items: center; font-size: 12px; font-weight: 700; line-height: 1; color: #fff; background: #c3241b;
+  box-shadow: 0 0 6px #c3241b; pointer-events: none; }
+.ir-die input:checked ~ .badge { display: grid; }
+
+.ir-reroll-count { margin: 0; text-align: center; font-family: "Oswald", sans-serif; text-transform: uppercase;
+  letter-spacing: 1px; font-size: 12px; color: #bbb; border-top: 1px dashed #3a332d; padding-top: 5px; }
+.ir-reroll-count .n-reroll::before { content: counter(reroll) " dice"; color: #ff5446; }
+.ir-reroll-count .n-keep::before { content: counter(keep) " success(es)"; color: #7fe06a; }
+
+/* Optional zombie attack roll */
+.ir-zattack { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; }
+.ir-zattack .ir-zresult { font-size: 12px; color: #ddd; }
+.ir-table tr.ir-suggested td { background: rgba(195, 36, 27, .18); box-shadow: inset 3px 0 0 #c3241b; }

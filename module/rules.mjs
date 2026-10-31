@@ -176,7 +176,8 @@ export async function grotesque(monster, first) {
       await a.gainStress(1);
       if (!atLimit) await a.rollPanic();          // at the limit, gainStress already triggered Panic
     } else {
-      const r = await a.rollTest({ label: `${monster.name}: keep it together`, attribute: "heart", skill: "willpower", tn: 4 });
+      const r = await a.rollTest({ label: `${monster.name}: keep it together`, attribute: "heart", skill: "willpower", tn: 4,
+        followUp: { kind: "stress", amount: a.system.stress.value < 6 ? 1 : 0 } });
       if (!r.successes) await a.gainStress(1);
     }
   }
@@ -188,7 +189,8 @@ export async function roar(monster) {
   if (!targets.length) return ui.notifications.warn("No survivor tokens in the scene (or select the ones who hear it).");
   const failed = [];
   for (const a of targets) {
-    const r = await a.rollTest({ label: `${monster.name}: Terrifying Roar`, attribute: "heart", skill: "willpower", tn: 5 });
+    const r = await a.rollTest({ label: `${monster.name}: Terrifying Roar`, attribute: "heart", skill: "willpower", tn: 5,
+        followUp: { kind: "stress", amount: a.system.stress.value < 6 ? 1 : 0 } });
     if (!r.successes) { failed.push(a.name); await a.gainStress(1); }
   }
   return card(monster, `${monster.name}: Terrifying Roar`,

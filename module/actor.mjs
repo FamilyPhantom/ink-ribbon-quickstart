@@ -1,7 +1,7 @@
 import { ATTRIBUTES, SKILLS, CONDITIONS, panicEffect, deathResult, SUPPLIES, TOOLS, TOOL_ADVANTAGE, RECIPES, CRAFT_FAILURE, ATTACHMENTS, RANGE_BANDS, HOLSTERS, MAX_HOLSTERS } from "./config.mjs";
 import { showRoll } from "./dice.mjs";
 import { addCondition, removeCondition, damageButton, conditionButton, hitWeakPoint, mutate } from "./rules.mjs";
-import { ITEMS } from "./starter.mjs";
+import { itemSource } from "./compendium.mjs";
 import { resolveInventory, fittedGun, sizeOf } from "./inventory.mjs";
 import { isSafeRoomOpen, safeRoomNoTest } from "./safeRoom.mjs";
 import { snapOutOfMalaise } from "./infection.mjs";
@@ -136,7 +136,7 @@ export class InkActor extends Actor {
    * Pool of 0 or less: roll 1 die, only a 6 succeeds.
    */
   async rollTest({ label, attribute, skill = null, tn = 4, advantage = 0, complication = 0,
-                   adrenaline = false, ignoreStress = 0, useBanked = false, fixedPool = null, flavorExtra = "" }) {
+                   adrenaline = false, ignoreStress = 0, useBanked = false, fixedPool = null, flavorExtra = "", followUp = null }) {
     const s = this.system;
 
     if (adrenaline) {
@@ -166,27 +166,150 @@ export class InkActor extends Actor {
     let target = tn, desperate = false;
     if (pool <= 0) { pool = 1; target = 6; desperate = true; }
 
-    const roll = await new Roll(`${pool}d6`).evaluate();
-    const successes = roll.dice[0].results.filter(r => r.result >= target).length;
+    // Everything needed to re-roll this exact Test later (right-click the message -> Re-roll with Adrenaline).
+    const test = { actorUuid: this.uuid, label, pool, target, tn, desperate, math: parts.join(" &bull; "), flavorExtra, followUp };
+    return this.#rollPool(test);
+  }
+
+  /**
+   * Roll a Test's pool and post it. Stores the Test (and every die) on the message so it can be re-rolled.
+   * kept: dice kept from the previous roll when re-rolling only some of them.
+   */
+  async #rollPool(test, { reroll = null, kept = [] } = {}) {
+    const { label, pool, target, tn, desperate, math, flavorExtra } = test;
+    const n = pool - kept.length;
+    const roll = await new Roll(`${n}d6`).evaluate();
+    const fresh = roll.dice[0].results.map(r => r.result);
+    const results = [...kept, ...fresh];
+    const successes = results.filter(r => r >= target).length;
     const extras = Math.max(0, successes - 1);
 
     let outcome = successes
       ? `<div class="ir-result success">SUCCESS${extras ? ` &mdash; ${extras} extra` : ""}</div>`
       : `<div class="ir-result failure">FAILURE</div>`;
     if (extras >= 2) outcome += `<div class="ir-hint">2 extra: may bank a die${extras >= 3 ? " &bull; 3 extra: may reduce Stress by 1d3" : ""}</div>`;
+    const rerollNote = reroll
+      ? `<div class="ir-hint">1 Adrenaline spent. Kept: ${kept.length ? kept.join(", ") : "none"} &bull; Re-rolled ${n}: <b>${fresh.join(", ")}</b> &bull; Dice now: ${results.join(", ")}</div>`
+      : "";
 
-    await roll.toMessage({
+    const message = await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      flavor: `<div class="ir-card"><h3>${label}</h3>
-        <div class="ir-math">${parts.join(" &bull; ")} = <b>${pool}d6</b> vs TN ${tn}${desperate ? " (pool 0: one die, 6 only)" : ""}</div>
-        ${flavorExtra}${outcome}</div>`
+      flavor: `<div class="ir-card"><h3>${label}${reroll ? " &mdash; Re-roll" : ""}</h3>
+        <div class="ir-math">${math} = <b>${pool}d6</b> vs TN ${tn}${desperate ? " (pool 0: one die, 6 only)" : ""}</div>
+        ${rerollNote}${flavorExtra}${outcome}</div>`,
+      flags: { [SYS]: { test: { ...test, results, successes, rerollOf: reroll } } }
     });
-    return { successes, extras, roll };
+    return { successes, extras, roll, message };
+  }
+
+  /* -------------------------------------------- */
+  /*  Adrenaline re-roll                          */
+  /* -------------------------------------------- */
+
+  /** Why this actor can't re-roll the Test in `message` right now (null = it can). */
+  static rerollBlocker(message) {
+    const test = message.getFlag(SYS, "test");
+    if (!test?.results || test.successes > 0) return "not a failed Test";
+    if (game.messages.some(m => m.flags?.[SYS]?.test?.rerollOf === message.id)) return "already re-rolled: use the newest result";
+    const actor = fromUuidSync(test.actorUuid);
+    if (!actor?.isOwner) return "not your character";
+    if ((actor.system.adrenaline?.value ?? 0) < 1) return `${actor.name} has no Adrenaline`;
+    if (CONDITIONS.some(c => c.noAdrenaline && actor.statuses.has(c.id))) return `${actor.name} can't use Adrenaline right now`;
+    return null;
+  }
+
+  /**
+   * Spend 1 Adrenaline to re-roll all or some dice of a failed Test (same TN). No limit: a re-roll that
+   * still fails can be re-rolled again while Adrenaline lasts. A success fixes what the failure did.
+   */
+  static async rerollTest(message) {
+    const why = InkActor.rerollBlocker(message);
+    if (why) return ui.notifications.warn(`Can't re-roll: ${why}.`);
+    const test = message.getFlag(SYS, "test");
+    const actor = fromUuidSync(test.actorUuid);
+
+    // Pick the dice to re-roll (the failed ones are marked). Pips are drawn on a 3x3 grid.
+    const PIPS = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+    const adr = actor.system.adrenaline.value;
+    const dice = test.results.map((r, i) => {
+      const hit = r >= test.target;
+      return `<label class="ir-die ${hit ? "hit" : "miss"}" data-tooltip="${r}: ${hit ? "success" : "miss"}">
+        <input type="checkbox" name="d${i}" ${hit ? "" : "checked"}>
+        <span class="face">${PIPS[r].map(p => `<i class="pip p${p}"></i>`).join("")}</span>
+        <span class="badge">&#8635;</span></label>`;
+    }).join("");
+    const form = await formDialog(`${test.label}: re-roll`, `<div class="ir-reroll">
+      <div class="ir-reroll-head">
+        <span class="tn">TN <b>${test.target}</b></span>
+        <span class="adr"><i class="fa-solid fa-heart-pulse"></i> Adrenaline <b>${adr}</b> &rarr; <b>${adr - 1}</b></span>
+      </div>
+      <p class="ir-reroll-help">Click the dice to re-roll. The rest are kept.</p>
+      <div class="ir-dice">${dice}</div>
+      <p class="ir-reroll-count">Re-rolling <b class="n-reroll"></b> &middot; keeping <b class="n-keep"></b></p>
+    </div>`, "Re-roll");
+    if (!form) return null;
+    const kept = test.results.filter((r, i) => !form[`d${i}`]);
+    if (kept.length === test.results.length) return ui.notifications.warn("Tick at least one die to re-roll.");
+
+    // Re-check: Adrenaline may have been spent while the dialog was open.
+    const left = actor.system.adrenaline.value;
+    if (left < 1) return ui.notifications.warn(`${actor.name} has no Adrenaline.`);
+    await actor.update({ "system.adrenaline.value": left - 1 });
+    const followUp = message.getFlag(SYS, "followUp") ?? test.followUp;
+    const res = await actor.#rollPool({ ...test, followUp }, { reroll: message.id, kept });
+    if (res.successes && followUp) await actor.#rerollSuccess(followUp, res.extras);
+    return res;
+  }
+
+  /** A re-roll passed: undo the failed result that was applied automatically, and apply the success. */
+  async #rerollSuccess(f, extras) {
+    const s = this.system;
+    const note = text => chat(this, `<div class="ir-card"><h3>Re-roll passed</h3><p>${text}</p></div>`);
+    switch (f.kind) {
+      case "attack": {
+        const item = this.items.get(f.itemId) ?? new CONFIG.Item.documentClass(f.itemData, { parent: this });
+        const target = f.target ? fromUuidSync(f.target) : null;
+        const prof = this.weaponProfile(item);
+        const add = f.noExtraDamage ? 0 : extras;                // thrown explosives: no extra damage
+        return this.#damageCard(item, prof.damage + add, add, {
+          target, headshot: f.headshot, weak: f.weak, explosive: f.explosive, prof, notes: ["Hit on the Adrenaline re-roll."]
+        });
+      }
+      case "escape":
+        await removeCondition(this, "caught");
+        return note(`${this.name} breaks free: Caught removed.`);
+      case "stress":
+        if (!f.amount) return note(`${this.name} keeps it together. (Stress was already at the limit: undo the Panic result by hand.)`);
+        await this.update({ "system.stress.value": Math.max(0, s.stress.value - f.amount) });
+        return note(`${this.name} keeps it together: the ${f.amount} Stress from the failure is removed.`);
+      case "healthpack":
+        await this.update({ ...f.update, "system.stress.value": Math.max(0, s.stress.value - (f.stress ?? 1)) });
+        return note(`${f.text} (The botched result and its +1 Stress are replaced.)`);
+      case "craft": {
+        const recipe = RECIPES.find(r => r.name === f.recipe);
+        if (!recipe) return;
+        if (recipe.kind === "ammo") {                           // the failure made half: add the rest
+          const missing = recipe.amount - f.qty;
+          if (missing > 0) await this.addToStacks(await itemSource(recipe.output, ["gear", "weapon"]), missing);
+          return note(`Crafted the full amount: +${missing} ${esc(recipe.output)}.`);
+        }
+        // Botched item(s): remove them and craft the proper version.
+        let left = f.qty;
+        for (const i of this.items.filter(i => i.name === f.item)) {
+          if (left <= 0) break;
+          const n = i.type === "gear" ? i.system.quantity : 1;
+          if (n > left) { await i.update({ "system.quantity": n - left }); left = 0; }
+          else { await i.delete(); left -= n; }
+        }
+        const { item, qty } = await this.#addCrafted(recipe, true);
+        return note(`The botched ${esc(f.item)} is replaced with <b>${qty} ${esc(item.name)}</b>.`);
+      }
+    }
   }
 
   /** Open the roll dialog with everything pre-filled, then roll. */
   async promptTest({ label, attribute, skill = null, tn = 4, isAttack = false, fixedPool = null, extraFields = "", complication = 0, complicationReason = "",
-                     advantage: extraAdv = 0, advantageReasons = [], hints: extraHints = [], modify = null }) {
+                     advantage: extraAdv = 0, advantageReasons = [], hints: extraHints = [], modify = null, followUp = null }) {
     const s = this.system;
     const pen = this.conditionPenalty(attribute, isAttack, skill);
     if (complication) { pen.total += complication; pen.reasons.push(complicationReason || `+${complication}`); }
@@ -253,7 +376,7 @@ export class InkActor extends Actor {
         attribute: r.attribute ?? attribute,
         tn: mod.tn ?? Number(r.tn), advantage: Number(r.advantage) + (mod.advantage ?? 0),
         complication: Number(r.complication) + (mod.complication ?? 0),
-        ignoreStress: Number(r.ignoreStress ?? 0), adrenaline: !!r.adrenaline, useBanked: !!r.useBanked
+        ignoreStress: Number(r.ignoreStress ?? 0), adrenaline: !!r.adrenaline, useBanked: !!r.useBanked, followUp
       })
     };
   }
@@ -381,6 +504,11 @@ export class InkActor extends Actor {
     const headshot = !!f.headshot && !f.weak;
     const weak = !!f.weak;
     const autoShots = Math.clamp(Number(f.auto ?? 0), 0, maxAuto);
+    // A miss can be re-rolled with Adrenaline: remember what a hit needs for its damage card.
+    if (!successes) await res.result.message?.setFlag(SYS, "followUp", {
+      kind: "attack", itemId: item.id, itemData: item.toObject(), target: target?.document?.uuid ?? null, headshot, weak, explosive,
+      noExtraDamage: isWeapon && w.category === "thrown"
+    });
 
     // Spend Shots / use up single-use weapons / Brittle / Loud.
     const notes = [];
@@ -412,7 +540,10 @@ export class InkActor extends Actor {
     if (isWeapon && w.singleUse) notes.push(`${item.name} is used up.`);
     if (isWeapon && w.category === "thrown" && w.description) notes.push(`<i>${w.description}</i>`);
 
-    if (successes) await this.#damageCard(item, prof.damage + extras, extras, { target, notes, headshot, weak, explosive, prof });
+    // Thrown explosives (grenade, pipe bomb, Molotov, smoke bomb): extra successes can't add damage (rules p.31).
+    const noExtraDamage = isWeapon && w.category === "thrown";
+    if (successes && noExtraDamage && extras) notes.push(`Thrown explosive: the ${extras} extra success(es) can't add damage (they can still bank a die or relieve Stress).`);
+    if (successes) await this.#damageCard(item, prof.damage + (noExtraDamage ? 0 : extras), noExtraDamage ? 0 : extras, { target, notes, headshot, weak, explosive, prof });
     else if (notes.length) await chat(this, `<div class="ir-card"><h3>${item.name}: miss</h3>${notes.map(n => `<p>${n}</p>`).join("")}</div>`);
     if (brittleRoll) await showRoll(brittleRoll, this, `${item.name}: Brittle check`,
       `1d6 = ${brittleRoll.total} vs Horror ${getHorror()}: ${breaks ? `<b class="failure">it breaks!</b> +1 Stress.` : "it holds."}`);
@@ -745,10 +876,10 @@ export class InkActor extends Actor {
     } else if (g.use === "healthpack") {
       const tn = Math.max(2, 1 + s.ecg.value);
       const safe = safeRoomNoTest(this, ["medicine"]);
-      let success = safe.ok;
+      let success = safe.ok, res = null;
       if (success) msg = "Safe Room: no Test needed. ";
       else {
-        const res = await this.promptTest({ label: `${item.name} (Wits/Medicine, self)`, attribute: "wits", skill: "medicine", tn,
+        res = await this.promptTest({ label: `${item.name} (Wits/Medicine, self)`, attribute: "wits", skill: "medicine", tn,
           complication: 1, complicationReason: "Treating yourself -1",
           hints: safe.reason === "untrained" ? ["Safe Room, but you need to be Trained in Medicine to skip the Test."] : [] });
         if (!res) return;
@@ -761,6 +892,12 @@ export class InkActor extends Actor {
         await this.update({ "system.ecg.value": 0, "system.toughness.value": s.toughness.max });
         msg += "Fully healed: ECG cleared and Toughness restored.";
       } else {
+        // A botch can be re-rolled with Adrenaline: remember what a success would have done.
+        await res?.result.message?.setFlag(SYS, "followUp", half
+          ? { kind: "healthpack", update: { "system.ecg.value": s.ecg.value - Math.floor(s.ecg.value / 2), "system.toughness.value": toughnessHealed },
+              text: "Half strength: half the ECG cleared, half the missing Toughness restored.", stress: s.stress.value < 6 ? 1 : 0 }
+          : { kind: "healthpack", update: { "system.ecg.value": 0, "system.toughness.value": s.toughness.max },
+              text: "Fully healed: ECG cleared and Toughness restored.", stress: s.stress.value < 6 ? 1 : 0 });
         await this.update({
           "system.ecg.value": s.ecg.value - Math.floor(s.ecg.value / 2),
           "system.toughness.value": Math.max(s.toughness.value, Math.floor(s.toughness.max / 2)),
@@ -950,7 +1087,7 @@ export class InkActor extends Actor {
     const safe = safeRoomNoTest(this, recipe.skills);
     if (safe.reason === "untrained") hints.unshift(`Safe Room, but you need to be Trained in ${recipe.skills.map(k => SKILLS[k][0]).join(" or ")} to skip the Test.`);
     const skipTest = noTest ?? safe.ok;
-    let success = true;
+    let success = true, testMessage = null;
     if (!skipTest) {
       const res = await this.promptTest({
         label: `Craft ${recipe.name}`, attribute: recipe.attribute, skill: option.skill, tn: recipe.tn,
@@ -958,10 +1095,13 @@ export class InkActor extends Actor {
       });
       if (!res) return null;                                // dialog closed: nothing used up
       success = res.result.successes > 0;
+      testMessage = res.result.message;
     }
 
     await this.#useSupplies(recipe.inputs);
     const { item, qty, stacked } = await this.#addCrafted(recipe, success);
+    // A failed craft can be re-rolled with Adrenaline: remember what to fix.
+    if (!success && testMessage) await testMessage.setFlag(SYS, "followUp", { kind: "craft", recipe: recipe.name, qty, item: item.name });
 
     const lines = [`Used: ${ingredientText(recipe.inputs)}.`];
     if (skipTest) lines.push("Safe Room: no Test needed.");
@@ -993,13 +1133,10 @@ export class InkActor extends Actor {
 
   /**
    * Create the crafted item (or add to a matching stack).
-   * Source: a world item with that name (so your art is used), else the starter data.
+   * Source: a world item with that name, else the Equipment compendium (so your art is used), else the starter data.
    */
   async #addCrafted(recipe, success) {
-    const world = game.items.find(i => i.name === recipe.output && ["gear", "weapon"].includes(i.type));
-    const src = world ? world.toObject() : foundry.utils.deepClone(ITEMS.find(i => i.name === recipe.output) ?? { name: recipe.output, type: "gear", img: "icons/svg/item-bag.svg", system: {} });
-    delete src._id; delete src.folder; delete src.sort; delete src.ownership;
-    src.system ??= {};
+    const src = await itemSource(recipe.output, ["gear", "weapon"]);
 
     let qty = recipe.amount;
     if (!success && recipe.kind === "ammo") qty = Math.max(1, Math.floor(qty / 2));

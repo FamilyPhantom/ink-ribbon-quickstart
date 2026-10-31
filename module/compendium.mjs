@@ -50,6 +50,25 @@ export async function buildCompendiums({ quiet = false } = {}) {
   if (!quiet) ui.notifications.info("Ink Ribbon: compendiums built (Equipment, Talents, Monsters).");
 }
 
+/**
+ * Item data to give a survivor (crafting, Finding Supplies), keeping your art.
+ * Looks in: world Items sidebar -> Equipment compendium -> starter data.
+ */
+export async function itemSource(name, types = ["weapon", "gear", "armour"]) {
+  let doc = game.items.find(i => i.name === name && types.includes(i.type));
+  if (!doc) {
+    const pack = game.packs.get("world.ink-ribbon-equipment");
+    if (pack) {
+      const entry = (await pack.getIndex()).find(e => e.name === name);
+      if (entry) doc = await pack.getDocument(entry._id);
+    }
+  }
+  const src = doc ? doc.toObject() : foundry.utils.deepClone(ITEMS.find(i => i.name === name) ?? { name, type: "gear", img: "icons/svg/item-bag.svg", system: {} });
+  delete src._id; delete src.folder; delete src.sort; delete src.ownership; delete src._stats;
+  src.system ??= {};
+  return src;
+}
+
 /** First launch: build automatically if the packs don't exist yet. */
 export async function ensureCompendiums() {
   if (game.user !== game.users.activeGM) return;
