@@ -53,12 +53,18 @@
 
     <div class="ir-box">
       <h3>Attacks <a class="ir-add" data-action="createItem" data-type="attack" title="Add attack">+</a></h3>
+      {{#if (and isGM zombieAttackRoll)}}
+      <div class="ir-buttons ir-zattack">
+        <button type="button" data-action="zombieAttack" data-tooltip="Optional rule: roll 1d6 to pick its attack (1-4 Scratch or Grab, 5-6 Bite). Only use it when the zombie is attacking.">Which attack?</button>
+        {{#if suggested}}<span class="ir-zresult">Rolled {{suggested.roll}}: <b>{{suggested.name}}</b></span>{{/if}}
+      </div>
+      {{/if}}
       <table class="ir-table">
         <thead><tr><th>Attack</th><th>Pool</th><th>Dmg</th><th>Range</th><th></th></tr></thead>
         <tbody>
         {{#each attacks}}
-          <tr data-item-id="{{id}}">
-            <td><a class="rollable" data-action="attack" title="Roll (target a token first)">{{name}}</a>
+          <tr data-item-id="{{id}}" class="{{#if (eq id ../suggested.id)}}ir-suggested{{/if}}">
+            <td><a class="rollable" data-action="attack" title="Roll (target a token first)">{{name}}</a>{{#if (eq id ../suggested.id)}} <span class="ir-tag red">Use this</span>{{/if}}
               {{#if system.lethal}}<span class="ir-tag red">Lethal</span>{{/if}}{{#if system.noTest}}<span class="ir-tag">No Test</span>{{/if}}
               {{#if system.conditions}}<span class="ir-tag">{{system.conditions}}</span>{{/if}}
               {{#if system.description}}<div class="small">{{system.description}}</div>{{/if}}</td>

@@ -5,7 +5,7 @@
  * The result is whispered to the GM with Give buttons that put each find into a survivor's inventory.
  */
 import { FINDING_SUPPLIES, horrorColumn, USEFUL_ITEM, HEALING_ITEM, CRAFTING_FIND, GUN_TABLES, lookup } from "./config.mjs";
-import { ITEMS } from "./starter.mjs";
+import { itemSource } from "./compendium.mjs";
 
 const SYS = "ink-ribbon-quickstart";
 const { DialogV2 } = foundry.applications.api;
@@ -124,26 +124,20 @@ export async function findSupplies() {
   });
 }
 
-/** Item data for a find: a world item with that name (keeps your art), else the starter data. */
-function sourceFor(name) {
-  const world = game.items.find(i => i.name === name && ["weapon", "gear", "armour"].includes(i.type));
-  const src = world ? world.toObject() : foundry.utils.deepClone(ITEMS.find(i => i.name === name) ?? { name, type: "gear", img: "icons/svg/item-bag.svg", system: {} });
-  delete src._id; delete src.folder; delete src.sort; delete src.ownership;
-  src.system ??= {};
-  return src;
-}
+/** Item data for a find: world item, else Equipment compendium (keeps your art), else the starter data. */
+const sourceFor = name => itemSource(name);
 
 /** Put one find into a survivor's inventory. Returns a short note. */
 export async function give(actor, f, pick) {
   if (f.kind === "item") {
-    const src = sourceFor(f.name);
+    const src = await sourceFor(f.name);
     if (src.type === "gear") await actor.addToStacks(src, f.qty);
     else await actor.createEmbeddedDocuments("Item", Array.from({ length: f.qty }, () => ({ ...foundry.utils.deepClone(src), system: { ...src.system, inv: { x: -1, y: -1, rot: false }, quick: false } })));
     return `${f.qty > 1 ? `${f.qty} ` : ""}${f.name}`;
   }
   if (f.kind === "ammo") {
     const name = pick ?? f.names[0];
-    await actor.addToStacks(sourceFor(name), f.qty);
+    await actor.addToStacks(await sourceFor(name), f.qty);
     return `${f.qty} ${name}`;
   }
   if (f.kind === "fuel") {
@@ -154,7 +148,7 @@ export async function give(actor, f, pick) {
     return `${f.weapon} refuelled (${value}/${saw.system.shots.max})`;
   }
   // A gun: loaded with the Shots left (up to its capacity); any extra comes as matching ammo.
-  const src = sourceFor(f.name);
+  const src = await sourceFor(f.name);
   const max = src.system.shots?.max ?? 0;
   const loaded = Math.min(f.shots, max);
   src.system.shots = { value: loaded, max };
@@ -163,7 +157,7 @@ export async function give(actor, f, pick) {
   await actor.createEmbeddedDocuments("Item", [src]);
   const extra = f.shots - loaded;
   let note = `${f.name} (${loaded}/${max})`;
-  if (extra > 0 && f.ammo?.length) { await actor.addToStacks(sourceFor(f.ammo[0]), extra); note += ` + ${extra} ${f.ammo[0]}`; }
+  if (extra > 0 && f.ammo?.length) { await actor.addToStacks(await sourceFor(f.ammo[0]), extra); note += ` + ${extra} ${f.ammo[0]}`; }
   return note;
 }
 

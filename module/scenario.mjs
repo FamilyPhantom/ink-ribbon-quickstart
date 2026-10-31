@@ -62,3 +62,29 @@ export async function rollZombieTrait(actor) {
 
   return card(actor, `${actor.name}: Zombie Trait`, [`<b>d66 = ${d66}</b>: ${text}`, ...notes, "Added to its Abilities."], { whisper: true });
 }
+
+/* -------------------------------------------- */
+/*  Optional rule: zombie attack roll           */
+/* -------------------------------------------- */
+
+export const zombieAttackRollOn = () => game.settings.get(SYS, "zombieAttackRoll");
+
+/**
+ * Optional rule (from the publisher): when a zombie attacks, roll 1d6 to pick its attack.
+ * 1-4 = its Scratch (or Grab), 5-6 = Bite. Nothing goes to chat: the sheet highlights the result.
+ * Returns { roll, attack } (attack is an Item) or null.
+ */
+export async function rollZombieAttack(actor) {
+  if (!game.user.isGM || actor.type === "character") return null;
+  const attacks = actor.items.filter(i => i.type === "attack").sort((a, b) => a.sort - b.sort);
+  const bite = attacks.find(a => /bite/i.test(a.name));
+  const other = attacks.find(a => a !== bite);
+  if (!bite || !other) {
+    ui.notifications.warn(`${actor.name} needs a Bite and one other attack for the attack roll.`);
+    return null;
+  }
+  const roll = (await new Roll("1d6").evaluate()).total;
+  const attack = roll >= 5 ? bite : other;
+  ui.notifications.info(`${actor.name}: rolled ${roll}, use ${attack.name}.`);
+  return { roll, attack };
+}
